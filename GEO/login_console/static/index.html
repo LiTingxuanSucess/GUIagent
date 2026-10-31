@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CN AI 登录会话</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel2: #232d39;
+      --line: #2e3a48;
+      --text: #e7eef6;
+      --muted: #8b9bb0;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --warn: #e6b84d;
+      --bad: #e85d5d;
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); }
+    header.top {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: #121820;
+      position: sticky; top: 0; z-index: 5;
+    }
+    header.top h1 { margin: 0; font-size: 16px; }
+    header.top .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input, button {
+      font: inherit; border-radius: 6px; border: 1px solid var(--line);
+      background: var(--panel2); color: var(--text); padding: 7px 10px;
+    }
+    input { width: 160px; }
+    input.code { width: 120px; letter-spacing: 0.12em; }
+    button { cursor: pointer; }
+    button.primary { background: #1e4d7a; border-color: #2a6aa8; }
+    button:hover { border-color: var(--accent); }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 14px; padding: 14px;
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line);
+    }
+    .card-head h2 { margin: 0; font-size: 15px; }
+    .card-head .msg { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+    .badge {
+      flex: none; border-radius: 999px; padding: 3px 8px; font-size: 12px;
+      border: 1px solid var(--line); background: var(--panel2);
+    }
+    .badge.logged_in { color: var(--ok); border-color: #2a6a4a; }
+    .badge.need_captcha, .badge.waiting_sms { color: var(--warn); border-color: #6a5a2a; }
+    .badge.error, .badge.unknown { color: var(--bad); }
+    .shot {
+      display: block; width: 100%; aspect-ratio: 1280 / 800; object-fit: contain;
+      background: #0b0f14; cursor: crosshair;
+    }
+    .actions { display: flex; gap: 8px; align-items: center; padding: 10px 12px; flex-wrap: wrap; }
+    .hint { color: var(--muted); font-size: 12px; padding: 0 12px 12px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>国内六站登录会话</h1>
+      <div class="sub">掉线后服务会自动点「获取验证码」。点选验证码请直接点截图，短信填在卡片里提交。</div>
+    </div>
+    <div class="row">
+      <label>手机号</label>
+      <input id="phone" maxlength="11" />
+      <button class="primary" id="savePhone">保存</button>
+    </div>
+  </header>
+  <section class="grid" id="grid"></section>
+  <script>
+    const TOKEN = new URLSearchParams(location.search).get("token") || localStorage.getItem("cnai_token") || "";
+    if (new URLSearchParams(location.search).get("token")) localStorage.setItem("cnai_token", TOKEN);
+    const headers = TOKEN ? { "X-Token": TOKEN, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+    function shotUrl(siteId) {
+      const u = new URL("/api/sessions/" + siteId + "/screenshot", location.origin);
+      if (TOKEN) u.searchParams.set("token", TOKEN);
+      u.searchParams.set("t", String(Date.now()));
+      return u.pathname + u.search;
+    }
+    const STATUS = {
+      starting: "启动中", logged_in: "已登录", login_form: "待发码",
+      sending: "正在发码", need_captcha: "请点验证码", waiting_sms: "等待短信",
+      submitting: "提交中", error: "出错", unknown: "未知"
+    };
+
+    async function api(path, opt) {
+      const res = await fetch(path, Object.assign({ headers }, opt || {}));
+      if (res.status === 401) throw new Error("token 无效，请用带 ?token= 的地址打开");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      return data;
+    }
+
+    function card(site) {
+      return `<article class="card" id="card-${site.site_id}">
+        <div class="card-head">
+          <div>
+            <h2>${site.name}</h2>
+            <div class="msg" data-msg>${site.message || ""}</div>
+          </div>
+          <span class="badge ${site.status}" data-badge>${STATUS[site.status] || site.status}</span>
+        </div>
+        <img class="shot" data-shot alt="${site.name}" />
+        <div class="actions">
+          <input class="code" data-code maxlength="8" placeholder="短信验证码" />
+          <button class="primary" data-submit>提交验证码</button>
+          <button data-send>重新发码</button>
+        </div>
+        <div class="hint">点截图 = 点浏览器。验证码弹层出现后，按题目点图里的目标。</div>
+      </article>`;
+    }
+
+    function bind(site) {
+      const root = document.getElementById("card-" + site.site_id);
+      const img = root.querySelector("[data-shot]");
+      img.src = "/api/sessions/" + site.site_id + "/screenshot" + q + "&t=" + Date.now();
+      img.onclick = async (ev) => {
+        const r = img.getBoundingClientRect();
+        const nx = (ev.clientX - r.left) / r.width;
+        const ny = (ev.clientY - r.top) / r.height;
+        try {
+          const st = await api("/api/sessions/" + site.site_id + "/click", {
+            method: "POST", body: JSON.stringify({ nx, ny })
+          });
+          paint(st);
+          img.src = shotUrl(site.site_id);
+        } catch (e) { alert(e.message); }
+      };
+      root.querySelector("[data-send]").onclick = async () => {
+        try {
+          const st = await api("/api/sessions/" + site.site_id + "/send-code", { method: "POST", body: "{}" });
+          paint(st);
+        } catch (e) { alert(e.message); }
+      };
+      root.querySelector("[data-submit]").onclick = async () => {
+        const code = root.querySelector("[data-code]").value.trim();
+        try {
+          const st = await api("/api/sessions/" + site.site_id + "/submit-code", {
+            method: "POST", body: JSON.stringify({ code })
+          });
+          paint(st);
+        } catch (e) { alert(e.message); }
+      };
+    }
+
+    function paint(site) {
+      const root = document.getElementById("card-" + site.site_id);
+      if (!root) return;
+      root.querySelector("[data-msg]").textContent = site.message || "";
+      const badge = root.querySelector("[data-badge]");
+      badge.className = "badge " + site.status;
+      badge.textContent = STATUS[site.status] || site.status;
+    }
+
+    async function refresh() {
+      const snap = await api("/api/sessions");
+      document.getElementById("phone").value = snap.phone || "";
+      const grid = document.getElementById("grid");
+      if (!grid.dataset.ready) {
+        grid.innerHTML = snap.sites.map(card).join("");
+        snap.sites.forEach(bind);
+        grid.dataset.ready = "1";
+      }
+      snap.sites.forEach((site) => {
+        paint(site);
+        const img = document.querySelector("#card-" + site.site_id + " [data-shot]");
+        if (img) img.src = shotUrl(site.site_id);
+      });
+    }
+
+    document.getElementById("savePhone").onclick = async () => {
+      try {
+        await api("/api/phone", { method: "POST", body: JSON.stringify({ phone: document.getElementById("phone").value }) });
+      } catch (e) { alert(e.message); }
+    };
+
+    refresh().catch((e) => { document.getElementById("grid").innerHTML = "<p style='padding:18px'>" + e.message + "</p>"; });
+    setInterval(() => refresh().catch(() => {}), 2500);
+  </script>
+</body>
+</html>

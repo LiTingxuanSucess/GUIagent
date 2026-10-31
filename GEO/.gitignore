@@ -1,0 +1,34 @@
+# Local scrape / research artifacts
+.scrape_cache/
+exports/
+.chrome-cn-ai-profile/
+.chrome-cn-ai-profiles/
+.chrome-google-cdp-test/
+
+# Login console secrets
+login_console/certs/
+login_console/.env
+login_console/*.log
+login_console/*.pid
+
+# Go geo-server
+server/bin/
+server/server/bin/
+server/certs/
+server/config.local.yaml
+server/.env
+server/.admin-bootstrap
+server/.api-key
+server/.aksk.json
+server/.sms-token
+.session-store.json
+server/*.log
+server/*.pid
+server/data/
+
+# Ephemeral one-off analyzers
+tools/_*.py
+
+# Python
+__pycache__/
+*.py[cod]

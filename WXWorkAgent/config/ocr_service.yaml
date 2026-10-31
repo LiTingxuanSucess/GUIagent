@@ -1,0 +1,12 @@
+# OCR HTTP 后端（可由 wxwork_ocr_service.py 提供；也可指向云端网关转发到该服务）。
+# 覆盖优先级：环境变量 WXWORK_OCR_SERVICE_URL > 本文件 base_url；
+#           环境变量 WXWORK_OCR_SERVICE_TIMEOUT > 本文件 timeout_sec；
+#           环境变量 WXWORK_OCR_TRANSPORT=base64|path|auto（默认 auto）。
+#
+# 远端 OCR 必须与新版 wxwork_ocr_service.py 一致：POST /ocr 接受 JSON 「image_base64」
+# 传 PNG bytes（仅用 path 只适合文件已存在于 OCR 主机上的用法）。
+#
+# nginx 前缀示例：https://your-host:port/ocr-service → 网关 strip 后到上游 /health,/warmup,/ocr
+
+base_url: "http://region-41.seetacloud.com:47802/ocr-service"
+timeout_sec: 180

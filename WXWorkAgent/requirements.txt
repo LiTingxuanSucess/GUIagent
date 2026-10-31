@@ -1,0 +1,17 @@
+# Python 3.11 recommended. Run: py -3.11 -m pip install -r requirements.txt
+#
+# NumPy 2.x + 错误 wheel 组合会在 import 时出现 float16/float32 Signature 警告，
+# 并可能导致 Paddle predictor.run() 报 RuntimeError: Unknown exception。
+numpy>=1.26.4,<2.0
+mss>=10.0.0
+pyperclip>=1.8.0
+pywin32>=306
+requests>=2.28.0
+PyYAML>=6.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+# 3.3.x CPU 上 oneDNN+PIR 会触发 NotImplementedError（见 Paddle #77340），暂钉 3.2.2
+paddlepaddle==3.2.2
+paddleocr>=3.5.0
+filelock>=3.13.0
+rapidocr-onnxruntime>=1.4.4

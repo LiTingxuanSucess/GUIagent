@@ -1,0 +1,121 @@
+# Copy to config.yaml and tune crop/input ratios for your DPI / layout.
+
+capture:
+  # Message list + bubble area relative to WeWorkWindow client rect (0~1).
+  left_ratio: 0.27
+  top_ratio: 0.12
+  width_ratio: 0.72
+  height_ratio: 0.55
+
+reply_capture:
+  # Single reply only needs the latest few messages; keeping this smaller
+  # makes OCR much faster than scanning the whole visible history.
+  left_ratio: 0.27
+  top_ratio: 0.34
+  width_ratio: 0.72
+  height_ratio: 0.30
+
+input:
+  # Click to focus the composer: from bottom of window, fraction of height.
+  click_from_bottom_ratio: 0.10
+
+timing:
+  after_search_sec: 1.0
+  after_activate_sec: 0.35
+  between_keys_sec: 0.12
+
+qwen:
+  # 可选：不配则依次尝试环境变量 DASHSCOPE_API_KEY、上级目录 PRAgent/config.yaml 的 global.api_key
+  api_key: null
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen-turbo"
+  temperature: 0.3
+  timeout: 60
+
+reply_engine:
+  # qwen or revai
+  provider: qwen
+
+revai:
+  base_url: "https://car.revai.cn"
+  endpoint: "/api/project/carzone/compat/chat/respond"
+  api_key: null
+  timeout: 60
+  session_prefix: "wxwork"
+  # latest_new sends only the detected new customer message to RevAI.
+  # full_prompt sends the whole local reply prompt.
+  message_mode: "latest_new"
+
+reply:
+  system: |
+    你是企业微信上的客服。根据「最近聊天记录」用简短、专业、友好的中文回复客户。
+    不要编造订单号或承诺无法兑现的内容。若信息不足，礼貌追问一条关键信息。
+    只输出要发送给客户的一段正文，不要前缀说明或 Markdown。
+
+# 轮询自动回复（wxwork_watch.py）
+watch:
+  interval_sec: 5.0
+  # 连续 N 次截图像素 hash 一致才认为画面稳定（抗闪烁 / 渲染中间态）
+  stable_samples: 2
+  stable_sleep_sec: 0.30
+  # 新增片段短于该长度则忽略（噪声）
+  min_new_chars: 2
+  # 每 N 次循环重新 Ctrl+F 搜联系人；0=仅在启动时搜一次
+  rescan_contact_every: 0
+  post_send_pause_sec: 1.2
+
+agent_loop:
+  interval_sec: 2.0
+  active_scan: false
+  include_message_time: true
+  auto_reply_contacts: []
+  reply_message_types: ["text"]
+  list_left_ratio: 0.045
+  list_top_ratio: 0.06
+  list_width_ratio: 0.225
+  list_height_ratio: 0.88
+
+# 添加外部客户（wxwork_add_customer.py）
+# 默认 PaddleOCR 全窗截图找字；未命中时用下面比例回退。布局差异可改 ocr_region_* / ocr_kw_*。
+add_customer:
+  use_ocr: true
+
+  ocr_region_contacts: [0.0, 0.0, 0.16, 1.0]
+  ocr_region_new_customers: [0.05, 0.03, 0.45, 0.48]
+  ocr_region_page_title: [0.25, 0.02, 0.65, 0.12]
+  ocr_region_toolbar_add: [0.82, 0.02, 0.99, 0.12]
+  ocr_region_dialog_search: [0.22, 0.08, 0.88, 0.62]
+  ocr_region_result_add: [0.34, 0.15, 0.99, 0.72]
+  ocr_region_send: [0.15, 0.35, 0.90, 0.96]
+
+  ocr_kw_contacts: ["通讯录"]
+  ocr_kw_new_customers: ["新的客户", "新客户"]
+  ocr_kw_toolbar_add: ["+ 添加", "+添加"]
+  ocr_kw_dialog_search: ["手机", "邮箱", "手机号"]
+  ocr_kw_result_add: ["添加"]
+  ocr_kw_send: ["发送"]
+  ocr_toolbar_add_max_len: 8
+  ocr_result_add_max_len: 6
+
+  contacts_rail_rx: 0.028
+  contacts_rail_ry: 0.775
+  new_customers_rx: 0.16
+  new_customers_ry: 0.21
+  toolbar_add_rx: 0.88
+  toolbar_add_ry: 0.13
+  dialog_search_rx: 0.58
+  dialog_search_ry: 0.36
+  result_add_rx: 0.74
+  result_add_ry: 0.44
+  invite_send_rx: 0.50
+  invite_send_ry: 0.58
+  pause_after_contacts: 0.45
+  pause_after_new_customers: 0.40
+  pause_after_toolbar_add: 0.55
+  pause_after_dialog: 0.45
+  search_wait_sec: 1.80
+  pause_after_result_add: 0.70
+  pause_before_invite_send: 0.55
+  wait_dialog_timeout_sec: 3.0
+  wait_result_timeout_sec: 4.0
+  wait_invite_timeout_sec: 3.0

@@ -1,0 +1,18 @@
+browser:
+  cdp_url: "http://127.0.0.1:9222"
+
+taobao:
+  search_url: "https://www.taobao.com"
+  sort_by_sales: true
+  max_candidates: 12
+  detail_limit: 5
+  wait_after_search_sec: 4
+  wait_after_sort_sec: 3
+  detail_wait_sec: 4
+  use_ocr: false
+
+targets:
+  - platform: taobao
+    brand: "\u675c\u857e\u65af"
+    series: "001"
+    keyword: "\u675c\u857e\u65af 001"

@@ -1,0 +1,13 @@
+Task: {goal}
+Recent news extracted (last 10): {history}
+Current page interactable elements: {elements}
+
+Decide the next action. Return ONLY valid JSON, no other text:
+{"type": "click|type|scroll|next_page|done", "target": "element description or selector", "selector": "CSS selector if known", "coordinates": [x, y], "text": "input text for type", "reason": "brief reason"}
+
+Rules:
+- "next_page": go to next page of results
+- "type": enter keyword in search box (use "target" to describe which input)
+- "scroll": scroll down to load more
+- "done": task complete
+- Prefer selector over coordinates when available

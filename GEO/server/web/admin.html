@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GEO 登录会话</title>
+  <style>
+    :root {
+      --bg: #0f1419; --panel: #1a222c; --panel2: #232d39; --line: #2e3a48;
+      --text: #e7eef6; --muted: #8b9bb0; --accent: #3d9cf0; --ok: #3ecf8e;
+      --warn: #e6b84d; --bad: #e85d5d;
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); }
+    header.top {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: #121820;
+      position: sticky; top: 0; z-index: 5;
+    }
+    header.top h1 { margin: 0; font-size: 16px; }
+    header.top .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    a, button, input {
+      font: inherit; border-radius: 6px; border: 1px solid var(--line);
+      background: var(--panel2); color: var(--text); padding: 7px 10px; text-decoration: none;
+    }
+    input { width: 160px; }
+    input.code { width: 120px; letter-spacing: 0.12em; }
+    button, a.btn { cursor: pointer; }
+    button.primary { background: #1e4d7a; border-color: #2a6aa8; }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 14px; padding: 14px;
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line);
+    }
+    .card-head h2 { margin: 0; font-size: 15px; }
+    .card-head .msg { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+    .badge {
+      flex: none; border-radius: 999px; padding: 3px 8px; font-size: 12px;
+      border: 1px solid var(--line); background: var(--panel2);
+    }
+    .badge.logged_in { color: var(--ok); border-color: #2a6a4a; }
+    .badge.need_captcha, .badge.waiting_sms { color: var(--warn); border-color: #6a5a2a; }
+    .badge.error, .badge.unknown { color: var(--bad); }
+    .shot-frame { position: relative; background: #0b0f14; min-height: 180px; }
+    .shot {
+      display: block; width: 100%; height: auto; object-fit: contain;
+      background: #0b0f14; cursor: crosshair;
+    }
+    .shot-overlay {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(8, 12, 18, .62); color: #fff; font-size: 15px; font-weight: 650;
+    }
+    .shot-overlay[hidden] { display: none; }
+    .shot-meta {
+      position: absolute; left: 8px; bottom: 8px; padding: 4px 8px; border-radius: 6px;
+      background: rgba(12, 16, 22, .88); color: #e7eef6; font-size: 12px; pointer-events: none;
+      border: 1px solid rgba(255,255,255,.16);
+    }
+    .shot-frame.loading .shot { opacity: .35; }
+    .shot-frame.fresh { box-shadow: inset 0 0 0 3px var(--ok); }
+    .shot-frame.failed { box-shadow: inset 0 0 0 3px var(--bad); }
+    .actions { display: flex; gap: 8px; align-items: center; padding: 10px 12px; flex-wrap: wrap; }
+    .hint { color: var(--muted); font-size: 12px; padding: 0 12px 12px; }
+    .shell { display: flex; align-items: stretch; min-height: calc(100vh - 58px); }
+    .sidebar {
+      width: 200px; flex: none; background: #121820;
+      border-right: 1px solid var(--line);
+      position: sticky; top: 0; align-self: flex-start;
+      height: calc(100vh - 58px); padding: 8px;
+    }
+    .side-nav { display: flex; flex-direction: column; gap: 2px; }
+    .side-nav button { text-align: left; background: transparent; border-color: transparent; }
+    .side-nav button.on { background: #1e4d7a; border-color: #2a6aa8; }
+    .main { flex: 1; min-width: 0; }
+    .pagehead { padding: 16px 18px 0; }
+    .pagehead h2 { margin: 0; font-size: 18px; }
+    #phonePanel textarea { width: min(420px, 100%); }
+    #smsPanel table, #phonePanel table { min-width: 720px; }
+    tr.miss td { color: var(--warn); }
+
+    select, textarea {
+      font: inherit; border-radius: 6px; border: 1px solid var(--line);
+      background: var(--panel2); color: var(--text); padding: 7px 10px;
+    }
+    textarea { width: min(520px, 90vw); min-height: 58px; resize: vertical; }
+    .toolbar { padding: 12px 18px; border-bottom: 1px solid var(--line); background: #141b23; }
+    .stats { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .table-wrap { padding: 14px; overflow: auto; }
+    tr.group td { background: #101820; font-weight: 600; cursor: pointer; }
+    tr.group:hover td { background: #182230; }
+    tr.group .twist { display: inline-block; width: 1.2em; color: var(--muted); }
+    tr.group .count { margin-left: 10px; color: var(--muted); font-weight: 400; font-size: 12px; }
+    tr.child td.phone { padding-left: 28px; }
+    table { width: 100%; border-collapse: collapse; min-width: 980px; background: var(--panel); }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; font-size: 13px; }
+    th { color: var(--muted); background: #141b23; }
+    tr:hover td { background: #202a35; }
+    td .sub { color: var(--muted); font-size: 11px; margin-top: 3px; max-width: 320px; }
+    .danger { color: var(--bad); }
+    .detail-panel {
+      position: fixed; inset: 0; z-index: 40; margin: 0;
+      display: grid; place-items: center; padding: 24px;
+      background: rgba(0,0,0,.62);
+    }
+    .detail-panel[hidden] { display: none !important; }
+    .modal-card {
+      width: min(1100px, 96vw); max-height: 92vh; overflow: auto;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    }
+    .detail-head { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+    .detail-body { display: grid; grid-template-columns: minmax(320px, 2fr) minmax(260px, 1fr); }
+    .detail-actions { padding: 14px; }
+    .detail-actions input { width: 100%; margin: 6px 0 10px; }
+    .login-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+    .login-step {
+      padding: 7px 4px; border: 1px solid var(--line); border-radius: 6px;
+      color: var(--muted); font-size: 11px; text-align: center;
+    }
+    .login-step.active { color: var(--warn); border-color: #806b30; background: #332b19; }
+    .login-step.done { color: var(--ok); border-color: #2a6a4a; background: #183326; }
+    .login-steps.finished .login-step[data-step="4"] { color: var(--ok); border-color: #2a6a4a; background: #183326; font-weight: 650; }
+    .guide, .status-card, .login-block {
+      padding: 10px; margin-bottom: 10px; border: 1px solid var(--line);
+      border-radius: 8px; background: #151c24; font-size: 12px; line-height: 1.55;
+    }
+    .status-card { color: var(--text); }
+    .guide { color: var(--muted); }
+    .login-block strong { display: block; margin-bottom: 7px; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .action-row button { flex: 1; min-width: 110px; }
+    .notice { min-height: 20px; color: var(--warn); font-size: 12px; margin-top: 8px; }
+    button:disabled, input:disabled { cursor: not-allowed; opacity: .5; }
+    .shot.captcha { outline: 2px solid var(--warn); outline-offset: -2px; }
+    .batch-panel { margin: 0 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .batch-panel[hidden] { display: none; }
+    .batch-head { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .batch-progress { height: 6px; background: #0b0f14; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .batch-progress > span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+    .batch-body { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.4fr); }
+    .batch-current, .batch-list { padding: 14px; }
+    .batch-current { border-right: 1px solid var(--line); }
+    .batch-phone { font-size: 24px; font-weight: 650; letter-spacing: .04em; margin: 10px 0 4px; }
+    .batch-code { width: 100%; font-size: 20px; letter-spacing: .25em; text-align: center; margin: 10px 0; }
+    .batch-list { max-height: 360px; overflow: auto; }
+    .batch-item { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .batch-item.current { background: #1b3347; }
+    .batch-item .seq { color: var(--muted); }
+    .batch-item .result { color: var(--muted); text-align: right; }
+    .batch-item.success .result { color: var(--ok); }
+    .batch-item.error .result, .batch-item.needs_action .result { color: var(--bad); }
+    .batch-options { font-size: 12px; color: var(--muted); margin: 8px 0; }
+    .batch-options input { width: auto; vertical-align: middle; }
+    @media (max-width: 780px) { .detail-body { grid-template-columns: 1fr; } }
+    @media (max-width: 780px) {
+      .batch-body { grid-template-columns: 1fr; }
+      .batch-current { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>GEO 号池管理</h1>
+      <div class="sub">每个手机号使用独立浏览器 Profile；登录状态由主动访问平台验证，不依赖 Token 固定过期时间。</div>
+    </div>
+    <div class="row">
+      <a class="btn" href="/">任务控制台</a>
+      <a class="btn" href="/admin/monitor">请求看板</a>
+      <a class="btn" href="/admin/manual">人工接管与采集</a>
+      <button id="logout">退出</button>
+    </div>
+  </header>
+
+  <div class="shell">
+  <aside class="sidebar">
+    <nav class="side-nav">
+      <button type="button" class="on" id="tabBtnPool">登录状态</button>
+      <button type="button" id="tabBtnAnswer">回答验证</button>
+      <button type="button" id="tabBtnSms">短信记录</button>
+      <button type="button" id="tabBtnPhones">手机号</button>
+    </nav>
+  </aside>
+  <div class="main">
+  <div class="pagehead"><h2 id="pageTitle">登录状态</h2></div>
+  <section class="toolbar" id="poolTools">
+    <div class="row">
+      <label>平台</label>
+      <select id="siteFilter"></select>
+      <label>状态</label>
+      <select id="statusFilter">
+        <option value="">全部状态</option>
+        <option value="logged_in">已登录</option>
+        <option value="invalid">失效/未登录/未知</option>
+        <option value="expired">已失效</option>
+        <option value="not_logged_in">未登录</option>
+        <option value="unknown">未知</option>
+        <option value="waiting_sms">等待短信</option>
+        <option value="need_captcha">需要验证码</option>
+        <option value="error">异常</option>
+      </select>
+      <button id="btnSelectInvalid">选择全部失效</button>
+      <button id="btnBatchCheck">批量检测</button>
+      <button class="primary" id="btnBatchLogin">顺序批量登录</button>
+    </div>
+    <div class="stats" id="stats">加载中...</div>
+  </section>
+
+  <div id="phonePanel" hidden>
+    <section class="toolbar">
+      <div class="row">
+        <textarea id="phones" placeholder="输入手机号，多个号码可用换行、逗号或空格分隔"></textarea>
+        <button class="primary" id="btnImport">添加</button>
+      </div>
+    </section>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>手机号</th><th>账号</th><th>短信</th><th>启用</th></tr></thead>
+        <tbody id="phoneBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="table-wrap" id="smsPanel" hidden>
+    <table>
+      <thead>
+        <tr><th>手机号</th><th>时间</th><th>验证码</th><th>内容</th></tr>
+      </thead>
+      <tbody id="smsBody"></tbody>
+    </table>
+  </div>
+  <div class="table-wrap" id="answerPanel" hidden>
+    <table>
+      <thead>
+        <tr><th>手机号</th><th>平台</th><th>状态</th><th>说明</th><th>时间</th><th>操作</th></tr>
+      </thead>
+      <tbody id="answerBody"></tbody>
+    </table>
+  </div>
+  <div class="table-wrap" id="poolPanel">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="checkAll" /></th>
+          <th>手机号</th>
+          <th>平台</th>
+          <th>登录状态</th>
+          <th>检测依据</th>
+          <th>最后检测</th>
+          <th>最近登录</th>
+          <th>启用</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="accountBody"></tbody>
+    </table>
+  </div>
+
+  <section class="batch-panel" id="batchLoginPanel" hidden>
+    <div class="batch-head">
+      <div style="flex:1">
+        <strong id="batchTitle">批量登录工作台</strong>
+        <div class="stats" id="batchStats"></div>
+        <div class="batch-progress"><span id="batchProgress"></span></div>
+      </div>
+      <button id="btnCloseBatch">收起</button>
+    </div>
+    <div class="batch-body">
+      <div class="batch-current">
+        <div class="hint" style="padding:0">当前账号</div>
+        <div class="batch-phone" id="batchPhone">—</div>
+        <div class="badge" id="batchCurrentStatus">等待开始</div>
+        <div class="notice" id="batchNotice"></div>
+        <input class="batch-code" id="batchCode" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="短信验证码" />
+        <div class="action-row">
+          <button class="primary" id="btnBatchSubmitCode">提交并自动下一个</button>
+          <button id="btnBatchRetry">重试当前</button>
+          <button id="btnBatchSkip">跳过当前</button>
+        </div>
+        <div class="action-row" style="margin-top:8px">
+          <button id="btnBatchToggle">暂停</button>
+          <button id="btnBatchOpenDetail">打开截图处理</button>
+          <button class="danger" id="btnBatchFinish">结束队列</button>
+        </div>
+        <label class="batch-options">
+          <input type="checkbox" id="batchAutoSMS" checked />
+          自动匹配短信收件箱中的验证码并提交
+        </label>
+        <div class="hint" style="padding:0">队列一次只向一个手机号发码，避免大量短信混在一起；成功后自动处理下一个账号。</div>
+      </div>
+      <div class="batch-list" id="batchList"></div>
+    </div>
+  </section>
+
+  <section class="detail-panel" id="detail" hidden>
+    <div class="modal-card">
+    <div class="detail-head">
+      <strong id="detailTitle">登录处理</strong>
+      <button id="closeDetail">关闭</button>
+    </div>
+    <div class="detail-body">
+      <div class="shot-frame" id="shotFrame">
+        <img class="shot" id="detailShot" alt="浏览器截图" />
+        <div class="shot-overlay" id="shotOverlay" hidden>正在刷新截图…</div>
+        <div class="shot-meta" id="shotMeta">尚未刷新</div>
+      </div>
+      <div class="detail-actions">
+        <div class="login-steps" id="loginSteps">
+          <div class="login-step" data-step="1">1 检测</div>
+          <div class="login-step" data-step="2">2 发码/验证</div>
+          <div class="login-step" data-step="3">3 填验证码</div>
+          <div class="login-step" data-step="4">4 完成</div>
+        </div>
+        <div class="guide" id="siteGuide"></div>
+        <div id="detailStatus" class="status-card"></div>
+        <div class="login-block">
+          <strong id="checkTitle">第一步：检测并准备登录页</strong>
+          <div class="action-row">
+            <button id="btnCheckOne">重新检测</button>
+            <button id="btnRefreshShot">刷新截图</button>
+            <button class="primary" id="btnCursorAssist">Cursor CLI 处理当前页</button>
+          </div>
+        </div>
+        <div class="login-block" id="sendBlock">
+          <strong>第二步：向该手机号发送验证码</strong>
+          <button class="primary" id="btnSendOne">发送短信验证码</button>
+          <div class="notice" id="sendHint"></div>
+        </div>
+        <div class="login-block" id="codeBlock">
+          <strong>第三步：填写收到的短信验证码</strong>
+          <input class="code" id="smsCode" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="输入 4–8 位验证码" />
+          <div class="action-row">
+            <button id="btnFillSMS">从短信收件箱填入</button>
+            <button class="primary" id="btnSubmitOne">提交并验证登录</button>
+            <button id="btnCheckAfterSubmit">检测登录状态</button>
+          </div>
+        </div>
+        <div class="notice" id="detailNotice" role="status"></div>
+        <p class="hint" id="captchaHint" style="padding:8px 0">点选验证码直接点左侧截图。滑块要在截图上按住，从滑块拖到缺口，松手后再点“重新检测”。也可以点“Cursor CLI 处理当前页”，让它按当前画面点击和拖动滑块；它不会发短信、不会填验证码、不会替你提交问题。CLI 结束不等于登录成功，看刷新后的截图再点“重新检测”。</p>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  </div>
+  </div>
+  <script>
+    const STATUS = {
+      starting:"启动中", idle:"待检测", checking:"检测中", logged_in:"已登录",
+      expired:"已失效", not_logged_in:"未登录", login_form:"登录页", logging_in:"正在登录",
+      sending:"正在发码", need_captcha:"需要验证码", waiting_sms:"等待短信",
+      submitting:"提交中", error:"异常", unknown:"未知"
+    };
+    const INVALID = new Set(["expired", "not_logged_in", "unknown", "error", "idle", "login_form"]);
+    const SITE_GUIDES = {
+      deepseek:"DeepSeek：使用手机号短信登录；若出现图形验证，请直接在左侧截图中完成。",
+      doubao:"豆包：通常先打开登录弹窗再切换手机号登录，发码后可能出现点选或滑块验证。",
+      yiyan:"文心一言：登录由百度账号页完成，可能需要先同意协议或完成安全验证。",
+      yuanbao:"腾讯元宝：若默认显示微信登录，请在截图中切换到手机号登录后再发码。",
+      qianwen:"通义千问：登录由阿里账号页完成，遇到滑块验证需先在截图中处理。",
+      kimi:"Kimi：需要先打开登录弹窗并选择手机号快捷登录，再发送短信验证码。"
+    };
+    let accounts = [], sites = [], selected = new Set(), detailAccount = "", detailSite = "", renderSignature = "";
+    const collapsedGroups = new Set();
+    let detailBusy = false, detailBusyText = "", smsMessages = [], batchBusy = false, batchCollapsed = false;
+    let shotRefreshing = false, shotSeq = 0, cursorAssist = null;
+    let loginQueue = null;
+    try {
+      loginQueue = JSON.parse(localStorage.getItem("geo-login-queue") || "null");
+      if (loginQueue) {
+        loginQueue.running = false;
+        const current = loginQueue.items?.[loginQueue.current];
+        if (current?.status === "sending" || current?.status === "submitting") current.status = "waiting";
+        loginQueue.notice = "已恢复上次队列，点击“继续队列”后继续";
+      }
+    } catch (_) {
+      loginQueue = null;
+    }
+
+    async function api(path, opt) {
+      const res = await fetch(path, Object.assign({
+        credentials:"same-origin", headers:{"Content-Type":"application/json"}
+      }, opt || {}));
+      if (res.status === 401) {
+        location.href = "/admin/login?next=/admin";
+        throw new Error("需要登录");
+      }
+      const isJSON = res.headers.get("content-type")?.includes("application/json");
+      const data = isJSON ? await res.json() : null;
+      if (!res.ok) throw new Error(data?.detail || res.statusText);
+      return data || res;
+    }
+    const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    const siteID = () => document.getElementById("siteFilter").value;
+    const siteKey = s => s?.ID || s?.id || "";
+    const siteName = s => s?.Name || s?.name || siteKey(s);
+    const actionURL = (accountID, action, targetSite = detailSite || siteID()) =>
+      `/api/admin/accounts/${encodeURIComponent(accountID)}/sites/${encodeURIComponent(targetSite)}/${action}`;
+    const shotURL = (accountID) => actionURL(accountID, "screenshot") + "?t=" + Date.now();
+    function stateOf(a, targetSite = siteID()) {
+      return (a.sites && a.sites[targetSite]) || { site_id:targetSite, status:"not_logged_in", message:"尚未检测" };
+    }
+    function statusMatch(st, filter) {
+      if (!filter) return true;
+      if (filter === "invalid") return INVALID.has(st);
+      return st === filter;
+    }
+    function visibleAccounts() {
+      if (siteID() === "all") return [];
+      const filter = document.getElementById("statusFilter").value;
+      return accounts.filter(a => statusMatch(stateOf(a).status, filter));
+    }
+    function render() {
+      const allSites = siteID() === "all";
+      const selectedSites = allSites ? sites : sites.filter(s => siteKey(s) === siteID());
+      const filter = document.getElementById("statusFilter").value;
+      const groups = selectedSites.map(site => {
+        const rowSite = siteKey(site);
+        const rows = accounts.map(a => ({account:a, site, state:stateOf(a, rowSite)}))
+          .filter(row => statusMatch(row.state.status, filter) && !isAnswerChallenge(row.state));
+        return {site, rowSite, rows};
+      }).filter(g => g.rows.length);
+      const body = document.getElementById("accountBody");
+      body.innerHTML = groups.map(g => {
+        const open = !collapsedGroups.has(g.rowSite);
+        const ok = g.rows.filter(r => r.account.enabled && r.state.status === "logged_in").length;
+        const bad = g.rows.filter(r => r.account.enabled && INVALID.has(r.state.status)).length;
+        const head = `<tr class="group" data-group="${esc(g.rowSite)}">
+          <td colspan="9"><span class="twist">${open ? "▼" : "▶"}</span>${esc(siteName(g.site) || g.rowSite)}<span class="count">已登录 ${ok}/${g.rows.length} · 待处理 ${bad}</span></td>
+        </tr>`;
+        if (!open) return head;
+        const kids = g.rows.map(row => {
+          const a = row.account, st = row.state, rowSite = g.rowSite;
+          return `<tr class="child" data-id="${esc(a.id)}" data-site="${esc(rowSite)}">
+            <td><input type="checkbox" data-select ${selected.has(a.id) ? "checked" : ""} ${allSites ? "disabled" : ""}></td>
+            <td class="phone">${esc(a.phone)}<div class="sub">${esc(a.id)}</div></td>
+            <td></td>
+            <td><span class="badge ${esc(st.status)}">${esc(STATUS[st.status] || st.status)}</span><div class="sub">${esc(st.message || "")}</div></td>
+            <td>${esc(st.evidence || "—")}</td>
+            <td>${esc(st.last_checked_at || st.updated_at || "—")}</td>
+            <td>${esc(st.last_login_at || "—")}</td>
+            <td><button data-toggle>${a.enabled ? "停用" : "启用"}</button></td>
+            <td><button class="primary" data-login>登录/处理</button> <button class="danger" data-delete>删除</button></td>
+          </tr>`;
+        }).join("");
+        return head + kids;
+      }).join("") || `<tr><td colspan="9" style="text-align:center;color:var(--muted)">没有符合条件的账号</td></tr>`;
+      body.querySelectorAll("tr.group").forEach(tr => {
+        tr.onclick = () => {
+          const id = tr.dataset.group;
+          if (collapsedGroups.has(id)) collapsedGroups.delete(id);
+          else collapsedGroups.add(id);
+          render();
+        };
+      });
+      body.querySelectorAll("tr[data-id]").forEach(tr => {
+        const id = tr.dataset.id;
+        const rowSite = tr.dataset.site;
+        const checkbox = tr.querySelector("[data-select]");
+        if (!checkbox.disabled) checkbox.onchange = e => e.target.checked ? selected.add(id) : selected.delete(id);
+        tr.querySelector("[data-login]").onclick = () => openDetail(id, rowSite);
+        tr.querySelector("[data-toggle]").onclick = async () => {
+          const a = accounts.find(x => x.id === id);
+          const next = !a.enabled;
+          if (!next && !confirm("停用会立刻关闭这个账号的浏览器，正在进行的验证码页面会消失。确定停用？")) return;
+          await api(`/api/admin/accounts/${encodeURIComponent(id)}`, {method:"PATCH", body:JSON.stringify({enabled:next})});
+          await refresh();
+        };
+        const del = tr.querySelector("[data-delete]");
+        if (del) del.onclick = async () => {
+          if (!confirm("删除该账号及号池记录？浏览器 Profile 会保留，建议优先停用。")) return;
+          await api(`/api/admin/accounts/${encodeURIComponent(id)}`, {method:"DELETE"});
+          selected.delete(id);
+          await refresh();
+        };
+      });
+      const allRows = accounts.flatMap(a => selectedSites.map(site => ({account:a, state:stateOf(a, siteKey(site))})));
+      const valid = allRows.filter(row => row.account.enabled && row.state.status === "logged_in").length;
+      const invalid = allRows.filter(row => row.account.enabled && INVALID.has(row.state.status)).length;
+      document.getElementById("stats").textContent =
+        `号池 ${accounts.length} 个 · ${allSites ? "全部平台" : "当前平台"}可用 ${valid} 条 · 失效/待处理 ${invalid} 条 · 已选择 ${selected.size} 个`;
+      document.getElementById("checkAll").disabled = allSites;
+      document.getElementById("btnSelectInvalid").disabled = allSites;
+      document.getElementById("btnBatchCheck").disabled = allSites;
+      document.getElementById("btnBatchLogin").disabled = allSites;
+      if (detailAccount && accounts.some(a => a.id === detailAccount)) {
+        paintDetail();
+      } else if (detailAccount) {
+        detailAccount = "";
+        detailSite = "";
+        document.getElementById("detail").hidden = true;
+      }
+      renderAnswer();
+
+    }
+    let focusPhone = "";
+    function phoneDigits(v) {
+      return String(v || "").replace(/\D/g, "");
+    }
+    function renderPhoneList() {
+      const body = document.getElementById("phoneBody");
+      if (!body) return;
+      const seen = new Set();
+      const rows = [];
+      accounts.forEach(a => {
+        const phone = String(a.phone || "").trim();
+        if (!phone || seen.has(phone)) return;
+        seen.add(phone);
+        const n = smsMessages.filter(m => phoneDigits(m.receiver) === phoneDigits(phone)).length;
+        rows.push(`<tr class="${n ? "" : "miss"}" data-id="${esc(a.id)}">
+          <td>${esc(phone)}</td>
+          <td>${esc(a.id)}</td>
+          <td>${n ? "收到 " + n + " 条" : "未收到"}</td>
+          <td><button data-toggle>${a.enabled ? "停用" : "启用"}</button></td>
+        </tr>`);
+      });
+      body.innerHTML = rows.join("") || `<tr><td colspan="4" style="text-align:center;color:var(--muted)">还没有手机号</td></tr>`;
+      body.querySelectorAll("tr[data-id]").forEach(tr => {
+        tr.querySelector("[data-toggle]").onclick = async () => {
+          const a = accounts.find(x => x.id === tr.dataset.id);
+          const next = !a.enabled;
+          if (!next && !confirm("停用会立刻关闭这个账号的浏览器，正在进行的验证码页面会消失。确定停用？")) return;
+          await api(`/api/admin/accounts/${encodeURIComponent(tr.dataset.id)}`, {method:"PATCH", body:JSON.stringify({enabled:next})});
+          await refresh();
+        };
+      });
+    }
+    function smsStamp(m) {
+      return String((m && (m.time || m.received_at)) || "");
+    }
+    function renderSms() {
+      const phones = [];
+      const seen = new Set();
+      const add = (phone) => {
+        phone = String(phone || "").trim();
+        if (!phone || seen.has(phone)) return;
+        seen.add(phone);
+        phones.push(phone);
+      };
+      accounts.forEach(a => add(a.phone));
+      smsMessages.forEach(m => add(m.receiver));
+      const byPhone = new Map();
+      smsMessages.forEach(m => {
+        const phone = String(m.receiver || "").trim();
+        if (!byPhone.has(phone)) byPhone.set(phone, []);
+        byPhone.get(phone).push(m);
+      });
+      const body = document.getElementById("smsBody");
+      const visible = phones.filter(phone => !focusPhone || phoneDigits(phone) === phoneDigits(focusPhone));
+      const msgs = [];
+      const misses = [];
+      visible.forEach(phone => {
+        const list = byPhone.get(phone) || [];
+        if (!list.length) {
+          misses.push(`<tr class="miss"><td>${esc(phone)}</td><td>—</td><td>—</td><td>未收到</td></tr>`);
+          return;
+        }
+        list.forEach(m => msgs.push({t: smsStamp(m), phone, m}));
+      });
+      msgs.sort((a, b) => a.t < b.t ? 1 : a.t > b.t ? -1 : 0);
+      const rows = msgs.map(({phone, m}) => `<tr><td>${esc(phone)}</td><td>${esc(smsStamp(m))}</td><td>${esc(m.code || "—")}</td><td>${esc(m.result || "")}</td></tr>`);
+      body.innerHTML = rows.concat(misses).join("") || `<tr><td colspan="4" style="text-align:center;color:var(--muted)">暂无</td></tr>`;
+    }
+    function isAnswerChallenge(st) {
+      const msg = (st && st.message) || "";
+      return st && st.status === "need_captcha" && (msg.includes("语义") || msg.includes("平台触发安全验证"));
+    }
+    function renderAnswer() {
+      const body = document.getElementById("answerBody");
+      const rows = [];
+      accounts.forEach(a => {
+        sites.forEach(site => {
+          const rowSite = siteKey(site);
+          const st = stateOf(a, rowSite);
+          if (!isAnswerChallenge(st)) return;
+          rows.push(`<tr>
+            <td class="phone">${esc(a.phone)}<div class="sub">${esc(a.id)}</div></td>
+            <td>${esc(siteName(site) || rowSite)}</td>
+            <td><span class="badge need_captcha">提问验证</span></td>
+            <td>${esc(st.message || "")}</td>
+            <td>${esc(st.updated_at || st.last_checked_at || "—")}</td>
+            <td><button class="primary" data-answer="${esc(a.id)}" data-site="${esc(rowSite)}">接管验证</button></td>
+          </tr>`);
+        });
+      });
+      body.innerHTML = rows.join("") || `<tr><td colspan="6" style="text-align:center;color:var(--muted)">当前没有待点的提问验证</td></tr>`;
+      body.querySelectorAll("[data-answer]").forEach(btn => {
+        btn.onclick = () => openDetail(btn.dataset.answer, btn.dataset.site);
+      });
+    }
+    function showMainTab(name) {
+      const pool = name === "pool";
+      const answer = name === "answer";
+      const sms = name === "sms";
+      const phones = name === "phones";
+      document.getElementById("poolTools").hidden = !pool;
+      document.getElementById("poolPanel").hidden = !pool;
+      document.getElementById("answerPanel").hidden = !answer;
+      document.getElementById("smsPanel").hidden = !sms;
+      document.getElementById("phonePanel").hidden = !phones;
+      document.getElementById("tabBtnPool").classList.toggle("on", pool);
+      document.getElementById("tabBtnAnswer").classList.toggle("on", answer);
+      document.getElementById("tabBtnSms").classList.toggle("on", sms);
+      document.getElementById("tabBtnPhones").classList.toggle("on", phones);
+      document.getElementById("pageTitle").textContent = answer ? "回答验证" : pool ? "登录状态" : sms ? "短信记录" : "手机号";
+      const batch = document.getElementById("batchLoginPanel");
+      const detail = document.getElementById("detail");
+      if (answer) renderAnswer();
+      if (!pool && !answer) {
+        batch.hidden = true;
+        detail.hidden = true;
+        if (sms) renderSms();
+        if (phones) renderPhoneList();
+      } else if (pool) {
+        batch.hidden = !(loginQueue && loginQueue.items && loginQueue.items.length);
+        detail.hidden = !detailAccount;
+      } else {
+        batch.hidden = true;
+        detail.hidden = !detailAccount;
+      }
+    }
+    async function refresh() {
+      const data = await api("/api/admin/accounts");
+      accounts = data.accounts || [];
+      sites = data.sites || [];
+      const select = document.getElementById("siteFilter");
+      if (!select.options.length) {
+        select.innerHTML = `<option value="all">全部平台</option>` +
+          sites.map(s => `<option value="${esc(siteKey(s))}">${esc(siteName(s))}</option>`).join("");
+      }
+      const signature = JSON.stringify({accounts, sites});
+      if (signature !== renderSignature) {
+        const liveIDs = new Set(accounts.map(a => a.id));
+        selected = new Set([...selected].filter(id => liveIDs.has(id)));
+        renderSignature = signature;
+        render();
+      }
+      try {
+        const box = await api("/api/admin/sms");
+        smsMessages = box.messages || [];
+        renderPhoneList();
+        renderSms();
+        maybeFillSMS(true);
+        paintBatch();
+        maybeAutoBatchSMS();
+      } catch (_) {}
+    }
+    function currentDetail() {
+      const account = accounts.find(x => x.id === detailAccount);
+      return account ? {account, state:stateOf(account, detailSite)} : null;
+    }
+    function loginStage(status) {
+      if (status === "logged_in") return 4;
+      if (status === "waiting_sms" || status === "submitting") return 3;
+      if (["logging_in","sending","login_form","need_captcha","expired","not_logged_in"].includes(status)) return 2;
+      return 1;
+    }
+    function setDetailBusy(busy, text = "") {
+      detailBusy = busy;
+      detailBusyText = text;
+      paintDetail();
+    }
+    function smsSite(text) {
+      text = text || "";
+      if (text.includes("豆包")) return "doubao";
+      if (text.includes("Kimi") || text.includes("月之暗面")) return "kimi";
+      if (text.includes("文心") || text.includes("百度")) return "yiyan";
+      if (text.includes("元宝")) return "yuanbao";
+      if (text.includes("千问") || text.includes("通义")) return "qianwen";
+      if (text.includes("DeepSeek") || text.includes("深度求索")) return "deepseek";
+      return "";
+    }
+    function smsFresh(m) {
+      const raw = String(m.received_at || m.time || "").replace(" ", "T");
+      const ts = Date.parse(raw);
+      if (!Number.isFinite(ts)) return false;
+      return Date.now() - ts < 5 * 60 * 1000 && ts - Date.now() < 60 * 1000;
+    }
+    function phoneMatch(a, b) {
+      a = String(a || "").replace(/\D/g, "");
+      b = String(b || "").replace(/\D/g, "");
+      if (a.length > 11) a = a.slice(-11);
+      if (b.length > 11) b = b.slice(-11);
+      return a && b && a === b;
+    }
+    let autoSubmitKey = "";
+    function matchingSMS() {
+      const item = currentDetail();
+      if (!item) return null;
+      const phone = item.account.phone;
+      return smsMessages.find(m => {
+        if (!m.code || !smsFresh(m) || !phoneMatch(m.receiver || m.phone, phone)) return false;
+        const site = smsSite(m.result || "");
+        return !site || site === detailSite;
+      }) || null;
+    }
+    function maybeFillSMS(silent = false) {
+      const input = document.getElementById("smsCode");
+      const item = currentDetail();
+      if (!item || item.state.status === "logged_in" || item.state.status === "submitting" || detailBusy) {
+        if (item?.state.status === "logged_in") input.value = "";
+        return false;
+      }
+      const msg = matchingSMS();
+      if (!msg) {
+        if (!silent) document.getElementById("detailNotice").textContent = "暂未找到与该手机号匹配的验证码短信";
+        return false;
+      }
+      const code = String(msg.code).replace(/\D/g, "");
+      input.value = code;
+      const key = [detailAccount, detailSite, smsSignature(msg)].join("|");
+      if (autoSubmitKey === key || code.length < 4) {
+        paintDetail();
+        return true;
+      }
+      autoSubmitKey = key;
+      document.getElementById("detailNotice").textContent = "已收到验证码，正在提交…";
+      paintDetail();
+      void one("submit-code", {code}).then(() => {
+        const after = currentDetail();
+        if (after && after.state.status !== "logged_in") autoSubmitKey = "";
+      });
+      return true;
+    }
+    const smsSignature = m => [m.requestid || "", m.received_at || m.time || "", m.receiver || m.phone || "", m.code || ""].join("|");
+    function saveLoginQueue() {
+      if (loginQueue) localStorage.setItem("geo-login-queue", JSON.stringify(loginQueue));
+      else localStorage.removeItem("geo-login-queue");
+    }
+    function currentBatchItem() {
+      return loginQueue?.items?.[loginQueue.current] || null;
+    }
+    function batchStatusText(status) {
+      return {
+        pending:"待处理", sending:"正在发码", waiting:"等待验证码", submitting:"正在提交",
+        success:"登录成功", needs_action:"需要人工处理", skipped:"已跳过", error:"处理失败"
+      }[status] || status || "待处理";
+    }
+    function matchingBatchSMS(item) {
+      if (!item || !loginQueue) return null;
+      const phone = String(item.phone || "").replace(/\D/g, "");
+      const seen = new Set(loginQueue.seen_sms || []);
+      return smsMessages.find(m => {
+        const receiver = String(m.receiver || m.phone || "").replace(/\D/g, "");
+        return m.code && !seen.has(smsSignature(m)) && receiver &&
+          (receiver === phone || receiver.endsWith(phone) || phone.endsWith(receiver));
+      }) || null;
+    }
+    function paintBatch() {
+      const panel = document.getElementById("batchLoginPanel");
+      if (!loginQueue?.items?.length) {
+        panel.hidden = true;
+        return;
+      }
+      panel.hidden = batchCollapsed;
+      const done = loginQueue.items.filter(x => ["success","skipped"].includes(x.status)).length;
+      const success = loginQueue.items.filter(x => x.status === "success").length;
+      const failed = loginQueue.items.filter(x => ["error","needs_action"].includes(x.status)).length;
+      const current = currentBatchItem();
+      document.getElementById("batchTitle").textContent =
+        `批量登录工作台 · ${siteName(sites.find(s => siteKey(s) === loginQueue.site_id)) || loginQueue.site_id}`;
+      document.getElementById("batchStats").textContent =
+        `总计 ${loginQueue.items.length} · 成功 ${success} · 已处理 ${done} · 待人工 ${failed}`;
+      document.getElementById("batchProgress").style.width =
+        `${loginQueue.items.length ? Math.round(done * 100 / loginQueue.items.length) : 0}%`;
+      document.getElementById("batchPhone").textContent = current?.phone || "全部处理完成";
+      const badge = document.getElementById("batchCurrentStatus");
+      badge.textContent = current ? batchStatusText(current.status) : "已完成";
+      badge.className = `badge ${current?.status === "success" ? "logged_in" : current?.status === "waiting" ? "waiting_sms" : current?.status || ""}`;
+      document.getElementById("batchNotice").textContent =
+        loginQueue.notice || current?.message || (current ? "准备处理当前账号" : "队列处理完成");
+      const canSubmit = current && current.status === "waiting" && !batchBusy;
+      const code = document.getElementById("batchCode");
+      code.disabled = !canSubmit;
+      document.getElementById("btnBatchSubmitCode").disabled =
+        !canSubmit || code.value.replace(/\D/g, "").length < 4;
+      document.getElementById("btnBatchRetry").disabled = !current || batchBusy || current.status === "success";
+      document.getElementById("btnBatchSkip").disabled = !current || batchBusy;
+      document.getElementById("btnBatchOpenDetail").disabled = !current || batchBusy;
+      document.getElementById("btnBatchToggle").disabled = !current || batchBusy;
+      document.getElementById("btnBatchToggle").textContent = loginQueue.running ? "暂停队列" : "继续队列";
+      document.getElementById("batchAutoSMS").checked = loginQueue.auto_sms !== false;
+      document.getElementById("batchList").innerHTML = loginQueue.items.map((item, i) =>
+        `<div class="batch-item ${esc(item.status)} ${i === loginQueue.current ? "current" : ""}">
+          <span class="seq">${i + 1}</span>
+          <span>${esc(item.phone)}<div class="sub">${esc(item.message || "")}</div></span>
+          <span class="result">${esc(batchStatusText(item.status))}</span>
+        </div>`).join("");
+    }
+    function finishBatchItem(item, status, message) {
+      item.status = status;
+      item.message = message || "";
+      loginQueue.notice = message || "";
+      saveLoginQueue();
+      paintBatch();
+    }
+    async function runBatchCurrent() {
+      if (!loginQueue?.running || batchBusy) return;
+      while (loginQueue.current < loginQueue.items.length &&
+             ["success","skipped"].includes(loginQueue.items[loginQueue.current].status)) {
+        loginQueue.current++;
+      }
+      const item = currentBatchItem();
+      if (!item) {
+        loginQueue.running = false;
+        loginQueue.notice = `队列完成：成功 ${loginQueue.items.filter(x => x.status === "success").length} 个`;
+        saveLoginQueue();
+        paintBatch();
+        return;
+      }
+      if (item.status === "waiting") {
+        loginQueue.notice = "等待当前账号的短信验证码";
+        saveLoginQueue();
+        paintBatch();
+        maybeAutoBatchSMS();
+        return;
+      }
+      const account = accounts.find(a => a.id === item.account_id);
+      if (!account?.enabled) {
+        finishBatchItem(item, "skipped", "账号已停用或不存在");
+        loginQueue.current++;
+        saveLoginQueue();
+        return runBatchCurrent();
+      }
+      batchBusy = true;
+      try {
+        if (item.status === "needs_action") {
+          loginQueue.notice = "正在复检人工处理结果…";
+          paintBatch();
+          const checked = await api(actionURL(item.account_id, "check", loginQueue.site_id), {method:"POST", body:"{}"});
+          if (checked.status === "logged_in") {
+            finishBatchItem(item, "success", "登录有效");
+            loginQueue.current++;
+            saveLoginQueue();
+            setTimeout(() => runBatchCurrent(), 0);
+            return;
+          }
+          if (checked.status === "waiting_sms") finishBatchItem(item, "waiting", checked.message);
+          else finishBatchItem(item, "needs_action", checked.message || "仍需在截图中处理");
+          return;
+        }
+        const live = stateOf(account, loginQueue.site_id);
+        if (live.status === "logged_in") {
+          finishBatchItem(item, "success", "已登录，自动跳过");
+          loginQueue.current++;
+          saveLoginQueue();
+          setTimeout(() => runBatchCurrent(), 0);
+          return;
+        }
+        item.status = "sending";
+        item.message = "正在打开登录页并发送验证码";
+        loginQueue.notice = `${item.phone} 正在发码，请稍候…`;
+        saveLoginQueue();
+        paintBatch();
+        const out = await api(actionURL(item.account_id, "send-code", loginQueue.site_id), {method:"POST", body:"{}"});
+        await refresh();
+        if (out.status === "logged_in") {
+          finishBatchItem(item, "success", "已登录，自动跳过");
+          loginQueue.current++;
+          saveLoginQueue();
+          setTimeout(() => runBatchCurrent(), 0);
+          return;
+        }
+        if (out.status === "need_captcha" || out.status === "login_form") {
+          finishBatchItem(item, "needs_action", out.message || "需要打开截图处理");
+        } else {
+          finishBatchItem(item, "waiting", out.message || "验证码已发送");
+        }
+      } catch (e) {
+        finishBatchItem(item, "error", e.message || "发码失败");
+      } finally {
+        batchBusy = false;
+        paintBatch();
+      }
+    }
+    async function submitBatchCode(rawCode, automatic = false) {
+      const item = currentBatchItem();
+      const code = String(rawCode || "").replace(/\D/g, "").slice(0, 8);
+      if (!item || code.length < 4 || batchBusy) return;
+      batchBusy = true;
+      item.status = "submitting";
+      item.message = automatic ? "已匹配短信，正在自动提交" : "正在提交验证码";
+      loginQueue.notice = item.message;
+      saveLoginQueue();
+      paintBatch();
+      try {
+        const out = await api(actionURL(item.account_id, "submit-code", loginQueue.site_id), {
+          method:"POST", body:JSON.stringify({code})
+        });
+        await refresh();
+        const live = accounts.find(a => a.id === item.account_id);
+        const status = out.status || (live && stateOf(live, loginQueue.site_id).status);
+        if (status === "logged_in") {
+          finishBatchItem(item, "success", "登录成功，正在处理下一个");
+          document.getElementById("batchCode").value = "";
+          loginQueue.current++;
+          saveLoginQueue();
+          paintBatch();
+          setTimeout(() => runBatchCurrent(), 0);
+          return;
+        }
+        if (status === "need_captcha" || status === "login_form") {
+          finishBatchItem(item, "needs_action", out.message || "需要人工处理");
+        } else {
+          finishBatchItem(item, "waiting", out.message || "未确认登录，请核对验证码后重试");
+        }
+      } catch (e) {
+        finishBatchItem(item, "waiting", e.message || "提交失败，请重试");
+      } finally {
+        batchBusy = false;
+        paintBatch();
+      }
+    }
+    function maybeAutoBatchSMS() {
+      const item = currentBatchItem();
+      if (!loginQueue?.running || loginQueue.auto_sms === false || batchBusy || item?.status !== "waiting") return;
+      const msg = matchingBatchSMS(item);
+      if (!msg) return;
+      loginQueue.seen_sms = [...(loginQueue.seen_sms || []), smsSignature(msg)].slice(-500);
+      document.getElementById("batchCode").value = String(msg.code).replace(/\D/g, "").slice(0, 8);
+      saveLoginQueue();
+      submitBatchCode(msg.code, true);
+    }
+    function startBatchLogin(ids) {
+      const targetSite = siteID();
+      const items = ids.map(id => {
+        const account = accounts.find(a => a.id === id);
+        return {account_id:id, phone:account?.phone || id, status:"pending", message:""};
+      });
+      loginQueue = {
+        site_id:targetSite, items, current:0, running:true, auto_sms:true,
+        seen_sms:smsMessages.map(smsSignature).slice(-500), notice:"队列已启动"
+      };
+      batchCollapsed = false;
+      document.getElementById("batchCode").value = "";
+      saveLoginQueue();
+      paintBatch();
+      document.getElementById("batchLoginPanel").scrollIntoView({behavior:"smooth", block:"start"});
+      runBatchCurrent();
+    }
+    async function openDetail(id, targetSite, inspectOnly = false) {
+      detailAccount = id;
+      detailSite = targetSite;
+      document.getElementById("detail").hidden = false;
+      document.getElementById("smsCode").value = "";
+      document.getElementById("shotFrame").classList.remove("failed");
+      paintDetail();
+      if (!inspectOnly) {
+        await one("check");
+        await autoSendIfNeeded();
+      }
+      if (!shotRefreshing) await refreshShot();
+    }
+    async function autoSendIfNeeded() {
+      const item = currentDetail();
+      if (!item) return;
+      const st = item.state || {};
+      const hold = ["logged_in", "need_captcha", "waiting_sms", "sending", "submitting", "checking"];
+      if (hold.includes(st.status)) return;
+      const elapsed = Date.now() / 1000 - Number(st.last_send_at || 0);
+      if (st.last_send_at && elapsed < 300) return;
+      document.getElementById("detailNotice").textContent = "正在自动填写手机号并发送验证码…";
+      await one("send-code");
+    }
+    function paintDetail(forceShot) {
+      const item = currentDetail();
+      if (!item) return;
+      const a = item.account, st = item.state;
+      document.getElementById("detailTitle").textContent = `${a.phone} · ${st.name || detailSite}`;
+      const loggedEarly = st.status === "logged_in";
+      const semantic = isAnswerChallenge(st);
+      document.getElementById("siteGuide").textContent = semantic
+        ? "这是提问后弹出的安全验证。在左侧截图上点完，再点重新检测。"
+        : loggedEarly
+        ? "已登录，这个页面可以直接使用，不用发短信。"
+        : (SITE_GUIDES[detailSite] || "按步骤完成检测、发码和验证码提交。");
+      document.getElementById("detailStatus").textContent = detailBusy
+        ? detailBusyText
+        : `${STATUS[st.status] || st.status}：${st.message || ""}`;
+      const stage = loginStage(st.status);
+      document.getElementById("loginSteps").hidden = semantic;
+      document.getElementById("loginSteps").classList.toggle("finished", loggedEarly && !semantic);
+      document.getElementById("checkTitle").textContent = semantic ? "在左侧截图上完成验证" : "第一步：检测并准备登录页";
+      document.querySelectorAll("#loginSteps [data-step]").forEach(el => {
+        const n = Number(el.dataset.step);
+        el.classList.toggle("done", n < stage || stage === 4);
+        el.classList.toggle("active", n === stage && stage !== 4);
+      });
+      const logged = st.status === "logged_in";
+      const cooldown = Math.max(0, Math.ceil(300 - (Date.now()/1000 - Number(st.last_send_at || 0))));
+      const send = document.getElementById("btnSendOne");
+      send.disabled = detailBusy || logged || cooldown > 0;
+      send.textContent = logged ? "当前已登录" : cooldown > 0 ? `${cooldown} 秒后可重发` : (st.status === "waiting_sms" ? "重新发送验证码" : "发送短信验证码");
+      document.getElementById("sendHint").textContent = logged
+        ? ""
+        : st.status === "need_captcha"
+        ? "请先完成左侧截图中的安全验证"
+        : cooldown > 0 ? "验证码已请求，请勿连续点击" : `验证码将发送到 ${a.phone}`;
+      const semanticClick = isAnswerChallenge(st);
+      document.getElementById("sendBlock").hidden = logged || semanticClick;
+      document.getElementById("codeBlock").hidden = logged || semanticClick;
+      document.getElementById("captchaHint").hidden = logged;
+      document.getElementById("btnCheckOne").disabled = detailBusy || cursorAssist;
+      const cliBtn = document.getElementById("btnCursorAssist");
+      cliBtn.disabled = detailBusy || cursorAssist || shotRefreshing;
+      cliBtn.textContent = cursorAssist ? "Cursor CLI 处理中…" : "Cursor CLI 处理当前页";
+      const refreshBtn = document.getElementById("btnRefreshShot");
+      refreshBtn.disabled = detailBusy || shotRefreshing;
+      if (!shotRefreshing) refreshBtn.textContent = "刷新截图";
+      document.getElementById("btnFillSMS").disabled = detailBusy || logged;
+      document.getElementById("btnCheckAfterSubmit").disabled = detailBusy;
+      const input = document.getElementById("smsCode");
+      input.disabled = detailBusy || logged;
+      document.getElementById("btnSubmitOne").disabled =
+        detailBusy || logged || input.value.replace(/\D/g, "").length < 4;
+      document.getElementById("detailShot").classList.toggle("captcha", st.status === "need_captcha");
+      if (!detailBusy && !shotRefreshing && !cursorAssist) {
+        const notice = document.getElementById("detailNotice");
+        if (st.status === "need_captcha") notice.textContent = "请先在左侧截图完成验证，然后点击“重新检测”";
+        else if (logged) notice.textContent = "登录已完成，该账号可以参与任务调度";
+        else if (st.status === "waiting_sms" && !input.value) notice.textContent = "正在等待验证码短信，也可以手动输入";
+        else if (/^正在/.test(notice.textContent)) notice.textContent = "请按当前状态继续下一步";
+      }
+      if (forceShot && !shotRefreshing) void refreshShot();
+    }
+    async function refreshShot() {
+      const item = currentDetail();
+      if (!item || shotRefreshing) return;
+      const seq = ++shotSeq;
+      shotRefreshing = true;
+      const btn = document.getElementById("btnRefreshShot");
+      const frame = document.getElementById("shotFrame");
+      const overlay = document.getElementById("shotOverlay");
+      const meta = document.getElementById("shotMeta");
+      const started = Date.now();
+      btn.disabled = true;
+      btn.textContent = "刷新中 0s";
+      frame.classList.add("loading");
+      frame.classList.remove("fresh", "failed");
+      overlay.hidden = false;
+      overlay.textContent = "正在刷新截图…";
+      meta.textContent = "正在向浏览器要新画面";
+      document.getElementById("detailNotice").textContent = "正在刷新截图，请稍候";
+      const tick = setInterval(() => {
+        if (seq !== shotSeq) return;
+        const sec = Math.floor((Date.now() - started) / 1000);
+        btn.textContent = `刷新中 ${sec}s`;
+        overlay.textContent = `正在刷新截图… ${sec}s`;
+      }, 400);
+      try {
+        const res = await fetch(shotURL(item.account.id), {credentials:"same-origin", cache:"no-store"});
+        if (seq !== shotSeq) return;
+        if (res.status === 401) {
+          location.href = "/admin/login?next=/admin";
+          return;
+        }
+        const type = res.headers.get("content-type") || "";
+        if (!res.ok || !type.includes("image")) {
+          let detail = res.statusText || "截图失败";
+          if (type.includes("json")) {
+            const data = await res.json().catch(() => null);
+            detail = data?.detail || detail;
+          }
+          throw new Error(detail);
+        }
+        const blob = await res.blob();
+        if (seq !== shotSeq) return;
+        const url = URL.createObjectURL(blob);
+        const img = document.getElementById("detailShot");
+        const prev = img.dataset.objectUrl || "";
+        await new Promise((resolve, reject) => {
+          img.onload = () => {
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              img.style.aspectRatio = img.naturalWidth + " / " + img.naturalHeight;
+            }
+            resolve();
+          };
+          img.onerror = () => reject(new Error("截图无法显示"));
+          img.src = url;
+        });
+        if (prev && prev !== url) URL.revokeObjectURL(prev);
+        img.dataset.objectUrl = url;
+        const stamp = new Date().toLocaleTimeString("zh-CN", {hour12:false});
+        meta.textContent = `已刷新 ${stamp}`;
+        overlay.hidden = true;
+        frame.classList.add("fresh");
+        document.getElementById("detailNotice").textContent = `截图已更新 ${stamp}`;
+        setTimeout(() => { if (seq === shotSeq) frame.classList.remove("fresh"); }, 1600);
+      } catch (e) {
+        if (seq !== shotSeq) return;
+        frame.classList.add("failed");
+        const reason = e.message || "截图刷新失败";
+        const img = document.getElementById("detailShot");
+        overlay.hidden = Boolean(img.getAttribute("src"));
+        overlay.textContent = reason;
+        meta.textContent = `刷新失败：${reason}`;
+        document.getElementById("detailNotice").textContent = reason;
+      } finally {
+        clearInterval(tick);
+        if (seq === shotSeq) {
+          shotRefreshing = false;
+          frame.classList.remove("loading");
+          paintDetail();
+        }
+      }
+    }
+    async function one(action, body) {
+      if (!detailAccount || detailBusy) return;
+      const busyText = {
+        check:"正在打开平台并检测登录状态…",
+        "send-code":"正在填写手机号并请求短信验证码…",
+        "submit-code":"正在提交验证码并确认登录…",
+        click:"正在同步截图点击…",
+        drag:"正在同步截图拖动…"
+      }[action] || "正在处理…";
+      setDetailBusy(true, busyText);
+      document.getElementById("detailNotice").textContent = busyText;
+      try {
+        await api(actionURL(detailAccount, action), {method:"POST", body:JSON.stringify(body || {})});
+        await refresh();
+        paintDetail(true);
+        maybeFillSMS(true);
+      } catch (e) {
+        document.getElementById("detailNotice").textContent = e.message || "操作失败";
+      } finally {
+        detailBusy = false;
+        detailBusyText = "";
+        paintDetail();
+      }
+    }
+    document.getElementById("tabBtnPool").onclick = () => showMainTab("pool");
+    document.getElementById("tabBtnAnswer").onclick = () => showMainTab("answer");
+    document.getElementById("tabBtnSms").onclick = () => showMainTab("sms");
+    document.getElementById("tabBtnPhones").onclick = () => showMainTab("phones");
+    document.getElementById("btnImport").onclick = async () => {
+      const raw = document.getElementById("phones").value;
+      const phones = raw.split(/[\s,，;；]+/).map(x => x.trim()).filter(Boolean);
+      if (!phones.length) return;
+      const out = await api("/api/admin/accounts", {method:"POST", body:JSON.stringify({phones})});
+      document.getElementById("phones").value = "";
+      if (out.errors?.length) alert(out.errors.join("\n"));
+      await refresh();
+    };
+    document.getElementById("siteFilter").onchange = () => {
+      selected.clear(); detailAccount = ""; detailSite = "";
+      document.getElementById("detail").hidden = true;
+      render();
+    };
+    document.getElementById("statusFilter").onchange = render;
+    document.getElementById("checkAll").onchange = e => {
+      visibleAccounts().forEach(a => e.target.checked ? selected.add(a.id) : selected.delete(a.id));
+      render();
+    };
+    document.getElementById("btnSelectInvalid").onclick = () => {
+      visibleAccounts().filter(a => a.enabled && INVALID.has(stateOf(a).status)).forEach(a => selected.add(a.id));
+      render();
+    };
+    async function batch(action) {
+      if (siteID() === "all") return alert("请先选择一个具体平台");
+      const ids = [...selected].filter(id => accounts.find(a => a.id === id)?.enabled);
+      if (!ids.length) return alert("请先选择启用的账号");
+      for (let i = 0; i < ids.length; i += 50) {
+        await api(`/api/admin/accounts/${action}`, {
+          method:"POST", body:JSON.stringify({account_ids:ids.slice(i, i + 50), site_id:siteID()})
+        });
+      }
+      setTimeout(() => refresh().catch(() => {}), 700);
+    }
+    document.getElementById("btnBatchCheck").onclick = () => batch("batch-check");
+    document.getElementById("btnBatchLogin").onclick = () => {
+      if (siteID() === "all") return alert("请先选择一个具体平台");
+      const ids = [...selected].filter(id => accounts.find(a => a.id === id)?.enabled);
+      if (!ids.length) return alert("请先选择启用的账号");
+      if (loginQueue?.items?.length && !confirm("当前已有批量登录队列，确定替换为新队列？")) return;
+      if (confirm(`将 ${ids.length} 个账号加入顺序登录队列？系统每次只向一个账号发码。`)) startBatchLogin(ids);
+    };
+    document.getElementById("btnCursorAssist").onclick = () => { void runCursorAssist(); };
+    async function runCursorAssist() {
+      if (!detailAccount || detailBusy || cursorAssist) return;
+      const accountID = detailAccount, site = detailSite;
+      document.getElementById("detailNotice").textContent = "正在把当前页交给 Cursor CLI，只做点击和滑动…";
+      paintDetail();
+      let callID = "";
+      try {
+        const started = await api(actionURL(accountID, "cursor-assist", site), {method:"POST", body:"{}"});
+        callID = started.call_id || "";
+        if (!callID) throw new Error("没有返回处理编号");
+      } catch (e) {
+        document.getElementById("detailNotice").textContent = e.message || "Cursor CLI 未能开始";
+        paintDetail();
+        return;
+      }
+      cursorAssist = callID;
+      paintDetail();
+      const startedAt = Date.now();
+      while (cursorAssist === callID && detailAccount === accountID && detailSite === site) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (cursorAssist !== callID) return;
+        let status;
+        try {
+          status = await api(actionURL(accountID, "cursor-assist", site) + "?call_id=" + encodeURIComponent(callID));
+        } catch (e) {
+          document.getElementById("detailNotice").textContent = e.message || "读取处理状态失败";
+          continue;
+        }
+        const state = status.status || "";
+        const sec = Math.floor((Date.now() - startedAt) / 1000);
+        if (state === "running" || state === "") {
+          document.getElementById("detailNotice").textContent = `Cursor CLI 正在按当前页点击或滑动… ${sec}s`;
+          continue;
+        }
+        cursorAssist = null;
+        const done = status.phase === "candidate"
+          ? "CLI 已结束。它认为挡路层已消失，请看左侧截图后点“重新检测”。这不代表登录已经成功。"
+          : "CLI 已结束，登录是否成功要以重新检测为准。请看左侧刷新后的截图。";
+        document.getElementById("detailNotice").textContent = status.error_code ? `${done}（${status.error_code}）` : done;
+        paintDetail();
+        if (!shotRefreshing) await refreshShot();
+        return;
+      }
+    }
+    document.getElementById("btnCheckOne").onclick = () => one("check");
+    document.getElementById("btnRefreshShot").onclick = () => { if (!detailBusy) void refreshShot(); };
+    document.getElementById("btnSendOne").onclick = () => {
+      const item = currentDetail();
+      if (item && confirm(`向 ${item.account.phone} 发送 ${item.state.name || detailSite} 登录验证码？`)) {
+        one("send-code");
+      }
+    };
+    document.getElementById("btnFillSMS").onclick = () => maybeFillSMS(false);
+    document.getElementById("btnCheckAfterSubmit").onclick = () => one("check");
+    document.getElementById("smsCode").oninput = e => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+      paintDetail();
+    };
+    document.getElementById("btnSubmitOne").onclick = () => {
+      const code = document.getElementById("smsCode").value.trim();
+      if (code.length >= 4) one("submit-code", {code});
+    };
+    document.getElementById("batchCode").oninput = e => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 8);
+      paintBatch();
+    };
+    document.getElementById("btnBatchSubmitCode").onclick = () =>
+      submitBatchCode(document.getElementById("batchCode").value);
+    document.getElementById("btnBatchRetry").onclick = () => {
+      const item = currentBatchItem();
+      if (!item || batchBusy) return;
+      item.status = "pending";
+      item.message = "";
+      loginQueue.running = true;
+      saveLoginQueue();
+      paintBatch();
+      runBatchCurrent();
+    };
+    document.getElementById("btnBatchSkip").onclick = () => {
+      const item = currentBatchItem();
+      if (!item || batchBusy) return;
+      finishBatchItem(item, "skipped", "人工跳过");
+      loginQueue.current++;
+      document.getElementById("batchCode").value = "";
+      saveLoginQueue();
+      paintBatch();
+      runBatchCurrent();
+    };
+    document.getElementById("btnBatchToggle").onclick = () => {
+      if (!loginQueue || batchBusy) return;
+      loginQueue.running = !loginQueue.running;
+      loginQueue.notice = loginQueue.running ? "队列继续运行" : "队列已暂停";
+      saveLoginQueue();
+      paintBatch();
+      if (loginQueue.running) runBatchCurrent();
+    };
+    document.getElementById("btnBatchOpenDetail").onclick = () => {
+      const item = currentBatchItem();
+      if (!item) return;
+      loginQueue.running = false;
+      loginQueue.notice = "队列已暂停；完成截图操作后点击“继续队列”复检";
+      saveLoginQueue();
+      paintBatch();
+      openDetail(item.account_id, loginQueue.site_id);
+    };
+    document.getElementById("batchAutoSMS").onchange = e => {
+      if (!loginQueue) return;
+      loginQueue.auto_sms = e.target.checked;
+      saveLoginQueue();
+      if (e.target.checked) maybeAutoBatchSMS();
+    };
+    document.getElementById("btnBatchFinish").onclick = () => {
+      if (!loginQueue || !confirm("结束并清除当前批量登录队列？已完成的登录状态不会受影响。")) return;
+      loginQueue = null;
+      batchBusy = false;
+      localStorage.removeItem("geo-login-queue");
+      document.getElementById("batchCode").value = "";
+      paintBatch();
+    };
+    document.getElementById("btnCloseBatch").onclick = () => {
+      batchCollapsed = true;
+      document.getElementById("batchLoginPanel").hidden = true;
+    };
+    function shotPoint(ev, img) {
+      const r = img.getBoundingClientRect();
+      const nw = img.naturalWidth || r.width;
+      const nh = img.naturalHeight || r.height;
+      const scale = Math.min(r.width / nw, r.height / nh);
+      const dw = nw * scale;
+      const dh = nh * scale;
+      const left = r.left + (r.width - dw) / 2;
+      const top = r.top + (r.height - dh) / 2;
+      const nx = (ev.clientX - left) / dw;
+      const ny = (ev.clientY - top) / dh;
+      if (nx < 0 || ny < 0 || nx > 1 || ny > 1) return null;
+      return {nx, ny};
+    }
+    const detailShot = document.getElementById("detailShot");
+    let shotDrag = null;
+    detailShot.addEventListener("pointerdown", ev => {
+      if (!detailAccount || ev.button !== 0) return;
+      const point = shotPoint(ev, detailShot);
+      if (!point) return;
+      shotDrag = point;
+      detailShot.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    detailShot.addEventListener("pointerup", async ev => {
+      if (!shotDrag) return;
+      const start = shotDrag;
+      shotDrag = null;
+      const end = shotPoint(ev, detailShot) || start;
+      const moved = Math.hypot(end.nx - start.nx, end.ny - start.ny);
+      if (moved < 0.012) await one("click", start);
+      else await one("drag", {nx: start.nx, ny: start.ny, nx2: end.nx, ny2: end.ny});
+    });
+    document.getElementById("closeDetail").onclick = () => {
+      detailAccount = ""; detailSite = "";
+      document.getElementById("detail").hidden = true;
+    };
+    document.getElementById("logout").onclick = async () => {
+      await api("/api/admin/logout", {method:"POST", body:"{}"});
+      location.href = "/admin/login";
+    };
+    paintBatch();
+    refresh().then(async () => {
+      const query = new URLSearchParams(location.search);
+      const account = query.get("account"), site = query.get("site");
+      if (query.get("inspect") === "1" && accounts.some(a => a.id === account) &&
+          ["deepseek", "doubao", "kimi", "qianwen", "yiyan", "yuanbao"].includes(site)) {
+        await openDetail(account, site, true);
+        document.getElementById("detail").scrollIntoView({block:"start"});
+      }
+    }).catch(e => { document.getElementById("stats").textContent = e.message; });
+    setInterval(() => refresh().catch(() => {}), 3000);
+    setInterval(() => { if (detailAccount) paintDetail(); }, 1000);
+  </script>
+</body>
+</html>

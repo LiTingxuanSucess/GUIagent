@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew GEO public HTTPS certificate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/opt/geo-certbot/bin/certbot renew --quiet --cert-name geo-public-ip
+TimeoutStartSec=240

@@ -1,0 +1,16 @@
+config.yaml
+.chrome-admin-profile/
+data/
+__pycache__/
+*.pyc
+*.pyd
+.pytest_cache/
+.venv/
+exports/
+logs/
+shots/
+*.png
+*.jpg
+tmp*.png
+web/frontend/node_modules/
+web/frontend/dist/

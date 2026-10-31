@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GEO 抓取结果</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel2: #232d39;
+      --line: #2e3a48;
+      --text: #e7eef6;
+      --muted: #8b9bb0;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --bad: #e85d5d;
+      --mono: "Cascadia Mono", "Sarasa Mono SC", Consolas, monospace;
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+    header.top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: #121820;
+      position: sticky; top: 0; z-index: 5;
+    }
+    header.top h1 { margin: 0; font-size: 16px; font-weight: 650; }
+    header.top .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .btn {
+      background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+      border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn.primary { background: #1e4d7a; border-color: #2a6aa8; }
+    .layout { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 58px); }
+    aside {
+      border-right: 1px solid var(--line); background: #121820; overflow: auto; padding: 10px 0;
+    }
+    aside h3 {
+      margin: 8px 14px; font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .q-item {
+      display: block; width: 100%; text-align: left; background: transparent;
+      border: 0; border-left: 3px solid transparent; color: var(--text);
+      padding: 12px 14px; cursor: pointer;
+    }
+    .q-item:hover { background: var(--panel); }
+    .q-item.active { background: var(--panel); border-left-color: var(--accent); }
+    .q-item .qid { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .q-item .prompt {
+      margin-top: 4px; font-size: 13px; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .q-item .meta { margin-top: 4px; font-size: 11px; color: var(--muted); }
+    main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+    .qhead {
+      padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .qhead h2 { margin: 0 0 6px; font-size: 16px; }
+    .qhead .prompt { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .pill {
+      display: inline-flex; gap: 6px; align-items: center; background: var(--panel2);
+      border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px;
+    }
+    .pill b { font-family: var(--mono); }
+    .body { display: grid; grid-template-columns: 280px 1fr; flex: 1; min-height: 0; }
+    .batches {
+      border-right: 1px solid var(--line); overflow: auto; background: #141b23; padding: 10px 0;
+    }
+    .batches h3 {
+      margin: 6px 14px 8px; font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .batch-item {
+      display: block; width: 100%; text-align: left; background: transparent; border: 0;
+      border-left: 3px solid transparent; color: var(--text); padding: 10px 14px; cursor: pointer;
+    }
+    .batch-item:hover { background: var(--panel); }
+    .batch-item.active { background: var(--panel); border-left-color: var(--ok); }
+    .batch-item .id { font-family: var(--mono); font-size: 12px; }
+    .batch-item .meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .right { display: flex; flex-direction: column; min-width: 0; overflow: auto; }
+    .channels { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+    .channels h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
+    .chan-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
+    }
+    .chan {
+      text-align: left; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 8px; padding: 10px 12px; cursor: pointer; color: var(--text);
+    }
+    .chan:hover { border-color: var(--accent); }
+    .chan.active { border-color: var(--accent); background: #1a3348; }
+    .chan .name { font-weight: 650; font-size: 13px; }
+    .chan .stat { margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .chan .ok { color: var(--ok); }
+    .chan .bad { color: var(--bad); }
+    .detail { padding: 14px 18px 28px; }
+    .detail h2 { margin: 0 0 8px; font-size: 15px; }
+    .meta-line {
+      color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 8px 14px;
+    }
+    .meta-line a { color: var(--accent); }
+    .answer {
+      margin-top: 12px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 8px; padding: 12px 14px; max-height: 420px; overflow: auto;
+      font-size: 13px; line-height: 1.65;
+    }
+    .answer > :first-child { margin-top: 0; }
+    .answer > :last-child { margin-bottom: 0; }
+    .answer h1, .answer h2, .answer h3, .answer h4 {
+      margin: 1em 0 0.45em; line-height: 1.3; font-weight: 650;
+    }
+    .answer h1 { font-size: 1.35em; }
+    .answer h2 { font-size: 1.2em; }
+    .answer h3 { font-size: 1.08em; }
+    .answer p { margin: 0.55em 0; }
+    .answer ul, .answer ol { margin: 0.55em 0; padding-left: 1.4em; }
+    .answer li { margin: 0.2em 0; }
+    .answer a { color: var(--accent); }
+    .answer blockquote {
+      margin: 0.6em 0; padding: 0.2em 0.8em; border-left: 3px solid var(--line); color: var(--muted);
+    }
+    .answer code {
+      font-family: var(--mono); font-size: 0.92em; background: var(--panel2);
+      padding: 0.1em 0.35em; border-radius: 4px;
+    }
+    .answer pre {
+      background: #0d1218; border: 1px solid var(--line); border-radius: 6px;
+      padding: 10px 12px; overflow: auto; white-space: pre;
+    }
+    .answer pre code { background: transparent; padding: 0; }
+    .answer table { border-collapse: collapse; width: 100%; margin: 0.6em 0; font-size: 12px; }
+    .answer th, .answer td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+    .answer th { background: var(--panel2); }
+    .answer hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+    .cites { margin-top: 14px; }
+    .cites h3 { margin: 0 0 8px; font-size: 13px; }
+    .domains { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .domains span {
+      background: var(--panel2); border: 1px solid var(--line); border-radius: 999px;
+      padding: 2px 8px; font-size: 11px; color: var(--muted); font-family: var(--mono);
+    }
+    .cites ol { margin: 0; padding-left: 20px; font-size: 12px; }
+    .cites li { margin: 4px 0; word-break: break-all; }
+    .cites a { color: var(--accent); }
+    .empty { color: var(--muted); padding: 36px 18px; text-align: center; font-size: 13px; }
+    .compare {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px; margin-top: 8px;
+    }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      padding: 10px 12px; font-size: 12px;
+    }
+    .card h4 { margin: 0 0 6px; font-size: 13px; }
+    .card .snip {
+      color: var(--muted); max-height: 130px; overflow: hidden; line-height: 1.45;
+    }
+    .card .snip p { margin: 0.35em 0; }
+    .card .snip h1, .card .snip h2, .card .snip h3 { font-size: 12px; margin: 0.4em 0; color: var(--text); }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .body { grid-template-columns: 1fr; }
+      aside { max-height: 220px; }
+      .batches { max-height: 200px; border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>GEO 抓取结果</h1>
+      <div class="sub">题目 → 批次 → 渠道 · 只读 exports</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a class="btn" href="/admin">登录会话</a>
+      <button class="btn" id="btnRefresh">刷新</button>
+      <button class="btn primary" id="btnCompare" disabled>本批次渠道对比</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside>
+      <h3>题目</h3>
+      <div id="qList"></div>
+    </aside>
+    <main>
+      <section class="qhead" id="qHead"><div class="empty">加载中…</div></section>
+      <div class="body">
+        <section class="batches">
+          <h3>批次</h3>
+          <div id="batchList"></div>
+        </section>
+        <section class="right">
+          <div class="channels" id="chanBox"><div class="empty">先选题目与批次</div></div>
+          <div class="detail" id="detailBox"><div class="empty">再点渠道查看全文与引用</div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="/static/vendor/marked.min.js"></script>
+  <script>
+    if (window.marked) {
+      marked.setOptions({ gfm: true, breaks: true });
+    }
+    function renderMd(text) {
+      const raw = String(text ?? "");
+      if (!raw) return esc("(空)");
+      if (window.marked) return marked.parse(raw);
+      return esc(raw).replace(/\n/g, "<br>");
+    }
+    const state = {
+      tree: null,
+      qid: null,
+      batchId: null,
+      siteId: null,
+      result: null,
+      mode: "detail", // detail | compare
+    };
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+      ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+    ));
+
+    async function api(path) {
+      const r = await fetch(path, { credentials: "same-origin" });
+      if (r.status === 401) {
+        location.href = "/admin/login?next=" + encodeURIComponent(location.pathname);
+        throw new Error("需要登录");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    function curQuestion() {
+      return (state.tree?.questions || []).find((q) => q.question_id === state.qid) || null;
+    }
+    function curBatch() {
+      const q = curQuestion();
+      if (!q) return null;
+      return (q.batches || []).find((b) => b.batch_id === state.batchId) || null;
+    }
+
+    function renderQList() {
+      const qs = state.tree?.questions || [];
+      if (!qs.length) {
+        $("qList").innerHTML = `<div class="empty">暂无数据</div>`;
+        return;
+      }
+      $("qList").innerHTML = qs.map((q) => `
+        <button class="q-item ${q.question_id===state.qid?"active":""}" data-q="${esc(q.question_id)}">
+          <div class="qid">${esc(q.question_id)}</div>
+          <div class="prompt">${esc(q.prompt)}</div>
+          <div class="meta">${q.batch_count} 个批次</div>
+        </button>
+      `).join("");
+      $("qList").querySelectorAll(".q-item").forEach((el) => {
+        el.onclick = () => selectQuestion(el.dataset.q);
+      });
+    }
+
+    function renderQHead() {
+      const q = curQuestion();
+      if (!q) {
+        $("qHead").innerHTML = `<div class="empty">选择左侧题目</div>`;
+        return;
+      }
+      const channelsAll = new Set();
+      (q.batches || []).forEach((b) => (b.channels || []).forEach((c) => channelsAll.add(c.site_id)));
+      $("qHead").innerHTML = `
+        <h2>${esc(q.question_id)}</h2>
+        <div class="prompt">${esc(q.prompt)}</div>
+        <div class="pills">
+          <span class="pill">批次 <b>${q.batch_count}</b></span>
+          <span class="pill">出现渠道 <b>${channelsAll.size}</b></span>
+        </div>
+      `;
+    }
+
+    function renderBatches() {
+      const q = curQuestion();
+      const box = $("batchList");
+      if (!q) { box.innerHTML = `<div class="empty">—</div>`; return; }
+      const batches = q.batches || [];
+      if (!batches.length) { box.innerHTML = `<div class="empty">无批次</div>`; return; }
+      box.innerHTML = batches.map((b) => {
+        const names = (b.channels || []).map((c) => c.site_name || c.site_id).join(" · ");
+        return `
+        <button class="batch-item ${b.batch_id===state.batchId?"active":""}" data-b="${esc(b.batch_id)}">
+          <div class="id">${esc(b.batch_id)}</div>
+          <div class="meta">${esc((b.timestamp||"").replace("T"," ").slice(0,19))} · ${b.ok_count}/${b.channel_count} ok · 引用 ${b.cite_count}</div>
+          <div class="meta">${esc(names || "—")}</div>
+        </button>`;
+      }).join("");
+      box.querySelectorAll(".batch-item").forEach((el) => {
+        el.onclick = () => selectBatch(el.dataset.b);
+      });
+    }
+
+    function renderChannels() {
+      const b = curBatch();
+      const box = $("chanBox");
+      if (!b) {
+        box.innerHTML = `<div class="empty">先选批次</div>`;
+        $("btnCompare").disabled = true;
+        return;
+      }
+      const chans = b.channels || [];
+      $("btnCompare").disabled = chans.length < 2;
+      box.innerHTML = `
+        <h3>渠道 · ${esc(b.batch_id)}（${chans.length}）</h3>
+        <div class="chan-grid">
+          ${chans.map((c) => `
+            <button class="chan ${c.site_id===state.siteId?"active":""}" data-s="${esc(c.site_id)}">
+              <div class="name">${esc(c.site_name || c.site_id)}</div>
+              <div class="stat">
+                <span class="${c.ok?"ok":"bad"}">${c.ok?"ok":"fail"}</span>
+                · cites ${c.citation_count}
+              </div>
+            </button>
+          `).join("")}
+        </div>
+      `;
+      box.querySelectorAll(".chan").forEach((el) => {
+        el.onclick = () => selectChannel(el.dataset.s);
+      });
+    }
+
+    async function renderDetail() {
+      const box = $("detailBox");
+      if (state.mode === "compare") {
+        renderCompare();
+        return;
+      }
+      if (!state.qid || !state.batchId || !state.siteId) {
+        box.innerHTML = `<div class="empty">再点渠道查看全文与引用</div>`;
+        return;
+      }
+      box.innerHTML = `<div class="empty">加载中…</div>`;
+      try {
+        const r = await api(`/api/result?batch_id=${encodeURIComponent(state.batchId)}&site_id=${encodeURIComponent(state.siteId)}&question_id=${encodeURIComponent(state.qid)}`);
+        state.result = r;
+        const cites = r.citations || [];
+        const domains = r.citation_domains || [...new Set(cites.map((u) => {
+          try { return new URL(u).hostname; } catch { return ""; }
+        }).filter(Boolean))];
+        box.innerHTML = `
+          <h2>${esc(r.site_name || r.site_id)} · ${esc(r.question_id)}</h2>
+          <div class="meta-line">
+            <span>batch=${esc(state.batchId)}</span>
+            <span>ok=<b style="color:${r.ok?"var(--ok)":"var(--bad)"}">${!!r.ok}</b></span>
+            <span>source=${esc(r.source || "—")}</span>
+            <span>${esc(r.timestamp || "")}</span>
+            ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">原站</a>` : ""}
+          </div>
+          <div class="meta-line" style="margin-top:6px">prompt: ${esc(r.prompt || "")}</div>
+          <div class="answer">${r.ok ? renderMd(r.answer) : esc(r.error || r.answer || "(空)")}</div>
+          <div class="cites">
+            <h3>citations (${cites.length})</h3>
+            <div class="domains">${domains.map((d) => `<span>${esc(d)}</span>`).join("")}</div>
+            <ol>${cites.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a></li>`).join("")}</ol>
+          </div>
+        `;
+      } catch (e) {
+        box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    function renderCompare() {
+      const b = curBatch();
+      if (!b) return;
+      $("detailBox").innerHTML = `
+        <h2>本批次渠道对比 · ${esc(state.qid)}</h2>
+        <div style="margin:8px 0"><button class="btn" id="btnBack">返回详情</button></div>
+        <div class="compare">
+          ${(b.channels || []).map((c) => `
+            <div class="card">
+              <h4>${esc(c.site_name || c.site_id)} · cites ${c.citation_count}</h4>
+              <div class="snip">${renderMd(c.answer_preview || "")}${(c.answer_len||0)>240?"…":""}</div>
+              <div style="margin-top:8px"><button class="btn" data-s="${esc(c.site_id)}">看全文</button></div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      $("btnBack").onclick = () => { state.mode = "detail"; renderDetail(); };
+      $("detailBox").querySelectorAll("button[data-s]").forEach((el) => {
+        el.onclick = () => {
+          state.mode = "detail";
+          selectChannel(el.dataset.s);
+        };
+      });
+    }
+
+    function pickDefaultBatch(q) {
+      const batches = q?.batches || [];
+      if (!batches.length) return null;
+      // 优先渠道数最多的批次（完整 6 站跑），其次最新
+      return [...batches].sort((a, b) => {
+        const dc = (b.channel_count || 0) - (a.channel_count || 0);
+        if (dc) return dc;
+        return String(b.timestamp || "").localeCompare(String(a.timestamp || ""));
+      })[0];
+    }
+
+    async function selectQuestion(qid) {
+      state.qid = qid;
+      state.batchId = null;
+      state.siteId = null;
+      state.result = null;
+      state.mode = "detail";
+      const q = curQuestion();
+      const def = pickDefaultBatch(q);
+      if (def) state.batchId = def.batch_id;
+      renderQList();
+      renderQHead();
+      renderBatches();
+      renderChannels();
+      const b = curBatch();
+      if (b?.channels?.length) {
+        state.siteId = b.channels[0].site_id;
+        renderChannels();
+        await renderDetail();
+      } else {
+        $("detailBox").innerHTML = `<div class="empty">该批次无渠道数据</div>`;
+      }
+    }
+
+    async function selectBatch(bid) {
+      state.batchId = bid;
+      state.siteId = null;
+      state.mode = "detail";
+      renderBatches();
+      renderChannels();
+      const b = curBatch();
+      if (b?.channels?.length) {
+        state.siteId = b.channels[0].site_id;
+        renderChannels();
+        await renderDetail();
+      } else {
+        $("detailBox").innerHTML = `<div class="empty">该批次无渠道数据</div>`;
+      }
+    }
+
+    async function selectChannel(sid) {
+      state.siteId = sid;
+      state.mode = "detail";
+      renderChannels();
+      await renderDetail();
+    }
+
+    async function boot() {
+      try {
+        state.tree = await api("/api/tree");
+        renderQList();
+        const first = state.tree.questions?.[0];
+        if (first) await selectQuestion(first.question_id);
+        else {
+          $("qHead").innerHTML = `<div class="empty">暂无 cn-ai-*.json</div>`;
+        }
+      } catch (e) {
+        $("qHead").innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+      }
+    }
+
+    $("btnRefresh").onclick = boot;
+    $("btnCompare").onclick = () => {
+      if (!curBatch()) return;
+      state.mode = "compare";
+      renderDetail();
+    };
+    boot();
+  </script>
+</body>
+</html>

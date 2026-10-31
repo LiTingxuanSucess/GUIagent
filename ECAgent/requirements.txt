@@ -1,0 +1,6 @@
+playwright>=1.44
+pyyaml>=6.0
+requests>=2.31
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+cloakbrowser>=0.3.28

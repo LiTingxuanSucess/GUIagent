@@ -1,0 +1,11 @@
+[Unit]
+Description=Check GEO HTTPS certificate renewal twice daily
+
+[Timer]
+OnCalendar=*-*-* 00,12:15:00
+RandomizedDelaySec=20min
+Persistent=true
+Unit=geo-certificate-renew.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,36 @@
+[Unit]
+Description=GEO CN-AI session server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/GUIAgent/GEO/server
+Environment=GEO_SERVER_ROOT=/root/workspace/GUIAgent/GEO/server
+Environment=HOME=/root
+Environment=PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-/root/workspace/GUIAgent/GEO/server/.env
+EnvironmentFile=-/root/workspace/GUIAgent/GEO/server/optimization.env
+Environment=GEO_PLATFORM_BUSY_RETRIES=3
+Environment=GEO_PLATFORM_BUSY_RETRY_BASE_SEC=30
+Environment=GEO_YUANBAO_TRANSIENT_RETRIES=1
+Environment=GEO_YUANBAO_RETRY_SEC=10
+ExecStartPre=/bin/rm -f /root/workspace/GUIAgent/GEO/.chrome-cn-ai-profile/SingletonLock /root/workspace/GUIAgent/GEO/.chrome-cn-ai-profile/SingletonCookie /root/workspace/GUIAgent/GEO/.chrome-cn-ai-profile/SingletonSocket
+ExecStart=/usr/bin/xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp -noreset" /root/workspace/GUIAgent/GEO/server/bin/geo-server
+Restart=on-failure
+RestartSec=8
+TimeoutStopSec=20
+KillMode=mixed
+KillSignal=SIGTERM
+LimitNOFILE=65535
+TasksMax=768
+MemoryAccounting=yes
+MemoryHigh=2300M
+MemoryMax=2800M
+OOMPolicy=stop
+StandardOutput=append:/root/workspace/GUIAgent/GEO/server/geo-server.out.log
+StandardError=append:/root/workspace/GUIAgent/GEO/server/geo-server.err.log
+SyslogIdentifier=geo-server
+
+[Install]
+WantedBy=multi-user.target

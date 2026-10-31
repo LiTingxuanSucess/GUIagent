@@ -1,0 +1,17 @@
+[Unit]
+Description=Sunlogin and human account login desktop
+Requires=geo-operator-x11.service
+After=geo-operator-x11.service runawesun.service
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/run/geo-operator/Xauthority
+Environment=HOME=/root
+Environment=LANG=zh_CN.UTF-8
+ExecStart=/usr/bin/dbus-run-session -- /usr/bin/python3 /root/workspace/GUIAgent/GEO/server/scripts/operator_desktop.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

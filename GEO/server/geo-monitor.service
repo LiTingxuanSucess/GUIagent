@@ -1,0 +1,26 @@
+[Unit]
+Description=GEO request dashboard and Feishu alerts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workspace/GUIAgent/GEO/server
+ExecStart=/usr/bin/python3 /root/workspace/GUIAgent/GEO/server/scripts/request_monitor.py --root /root/workspace/GUIAgent/GEO/server
+Restart=always
+RestartSec=5
+WatchdogSec=45s
+WatchdogSignal=SIGKILL
+NotifyAccess=main
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/root/workspace/GUIAgent/GEO/server/data
+MemoryMax=256M
+TasksMax=32
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

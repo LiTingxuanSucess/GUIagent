@@ -1,0 +1,14 @@
+listen: "0.0.0.0:443"
+public_ip: "127.0.0.1"
+phone: ""
+api_key: ""
+chrome_path: ""
+profile_dir: "../.chrome-cn-ai-profile"
+exports_dir: "../exports"
+questions_path: "../questions_cn.json"
+tls:
+  cert: certs/cert.pem
+  key: certs/key.pem
+admin:
+  user: admin
+  password_bcrypt: ""

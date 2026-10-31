@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Browser / local profiles
+.chrome-webagent-profile/
+.cloak-profiles/
+**/.chrome-cdp-profile/
+**/.chrome-admin-profile/
+**/.scrape_cache/
+
+# Runtime outputs
+exports/
+**/exports/
+logs/
+**/logs/
+**/shots/
+*.log
+
+# Node
+node_modules/
+**/node_modules/
+**/dist/
+
+# Secrets / local data
+.env
+**/.env
+**/.env.*
+**/*.env
+**/.monitoring.json
+**/.backups/
+gift_card.txt
+**/data/*.db
+**/data/*.db-*
+APAgent/gift_*
+APAgent/homepod_*
+**/config.yaml
+**/config.live.local.yaml
+GEO/frp-geo-40216/frpc.*.json
+GEO/frp-geo-40216/frpc.*.toml
+
+# Local checkout traces and operational notes
+APAgent/web/frontend/*smoke*.png
+APAgent/web/frontend/*verified*.png
+APAgent/web/frontend/apple-*-stage*.png
+APAgent/web/frontend/apple-*-stage*.txt
+APAgent/web/frontend/apple-shipping-controls*.json
+docs/apple_checkout_*.json
+docs/apple_add_to_bag_*.json
+docs/apple_iphone17_pro_max_*_extract.json
+docs/apple_iphone17_structured_bootstrap.json
+docs/apple_iphone17_bootstrap_keys.json
+GEO/IMPLEMENTATION_NOTES.md
+GEO/DEPLOY_AUTODL.md
+GEO/LOGIN_LESSONS.md
+GEO/GEO国产AI问答.md
+GEO/VIEWER_PLAN.md
+GEO/docs/CHANGES_2026-10-15.md
+GEO/frp-geo-40216/
+GEO/tools/update_autodl_geo.ps1
+deploy/macos/GEO_PUBLIC_ACCESS.md
+PRAgent/raw.md
+
+# Docs / assets
+*.pptx
+docs/pptx_assets/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

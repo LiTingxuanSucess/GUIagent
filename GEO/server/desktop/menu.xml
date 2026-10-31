@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="账号人工接管">
+    <item label="豆包：人工登录账号">
+      <action name="Execute"><command>xterm -T "GEO Doubao Login" -fa "DejaVu Sans Mono" -fs 11 -geometry 110x28+50+60 -e python3 /root/workspace/GUIAgent/GEO/server/scripts/manual_account_login.py --site doubao</command></action>
+    </item>
+    <item label="DeepSeek：人工检查账号">
+      <action name="Execute"><command>xterm -T "GEO DeepSeek Login" -fa "DejaVu Sans Mono" -fs 11 -geometry 110x28+50+60 -e python3 /root/workspace/GUIAgent/GEO/server/scripts/manual_account_login.py --site deepseek</command></action>
+    </item>
+    <separator/>
+    <item label="打开向日葵">
+      <action name="Execute"><command>/usr/local/awesun/awesun</command></action>
+    </item>
+  </menu>
+</openbox_menu>

@@ -1,0 +1,14 @@
+[Unit]
+Description=Private X11 display for human account login
+
+[Service]
+Type=simple
+RuntimeDirectory=geo-operator
+RuntimeDirectoryMode=0700
+ExecStartPre=/usr/bin/python3 /root/workspace/GUIAgent/GEO/server/scripts/prepare_operator_x11.py
+ExecStart=/usr/bin/Xvfb :0 -screen 0 1280x800x24 -nolisten tcp -noreset -auth /run/geo-operator/Xauthority
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

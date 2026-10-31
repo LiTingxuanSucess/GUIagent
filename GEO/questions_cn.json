@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "国内 AI 客户端问答批量抓取 — 问题清单",
+  "questions": [
+    {
+      "id": "solver_vendors",
+      "prompt": "求解器厂商推荐？",
+      "target_brand": null
+    },
+    {
+      "id": "decision_ai_vendors",
+      "prompt": "决策式AI厂商代表有哪些？",
+      "target_brand": null
+    },
+    {
+      "id": "ev_cars_global",
+      "prompt": "全球纯电家用车推荐？",
+      "target_brand": null
+    }
+  ]
+}

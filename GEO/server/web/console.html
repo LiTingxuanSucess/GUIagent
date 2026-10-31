@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GEO 控制台</title>
+  <style>
+    :root {
+      --bg: #0f1419; --panel: #1a222c; --panel2: #232d39; --line: #2e3a48;
+      --text: #e7eef6; --muted: #8b9bb0; --accent: #3d9cf0; --ok: #3ecf8e;
+      --warn: #e6b84d; --bad: #e85d5d;
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+    header.top {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 12px 18px; border-bottom: 1px solid var(--line); background: #121820;
+      position: sticky; top: 0; z-index: 5;
+    }
+    header.top h1 { margin: 0; font-size: 16px; }
+    header.top .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    button, select, input, a.btn {
+      font: inherit; border-radius: 6px; border: 1px solid var(--line);
+      background: var(--panel2); color: var(--text); padding: 7px 10px;
+    }
+    button, a.btn { cursor: pointer; text-decoration: none; }
+    button.primary { background: #1e4d7a; border-color: #2a6aa8; }
+    .wrap { padding: 14px 18px 28px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .card .k { color: var(--muted); font-size: 12px; }
+    .card .v { font-size: 22px; font-weight: 650; margin-top: 4px; font-family: var(--mono); }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; background: #141b23; }
+    tr:hover td { background: #1e2833; cursor: pointer; }
+    .st { border-radius: 999px; padding: 1px 8px; font-size: 12px; border: 1px solid var(--line); }
+    .st.succeeded { color: var(--ok); } .st.partial { color: var(--warn); }
+    .st.failed { color: var(--bad); } .st.cancelled { color: var(--muted); } .st.running, .st.queued { color: var(--accent); }
+    .empty { color: var(--muted); padding: 24px; text-align: center; }
+    .detail { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+    .detail h2 { margin: 0 0 8px; font-size: 15px; }
+    .ans { white-space: pre-wrap; line-height: 1.5; background: #121820; padding: 10px; border-radius: 8px; font-size: 13px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .login {
+      min-height: 100vh; display: grid; place-items: center; padding: 20px;
+    }
+    .login[hidden] { display: none; }
+    .box { width: min(420px, 94vw); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+    .box h1 { margin: 0 0 6px; font-size: 18px; }
+    .tabs { display: flex; gap: 8px; margin: 12px 0 16px; }
+    .tabs button { flex: 1; }
+    .tabs button.on { background: #1e4d7a; border-color: #2a6aa8; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .box input, .box button { width: 100%; }
+    .err { color: var(--bad); font-size: 13px; min-height: 1.2em; margin-top: 8px; }
+    .remember { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+    .remember input { width: auto; }
+    .warnbox { background: #3a2f14; border: 1px solid #6a5a2a; color: #f0e0a8; padding: 10px; border-radius: 8px; font-size: 13px; margin: 10px 0; word-break: break-all; }
+    .sitepill { display: inline-block; margin: 2px 4px 2px 0; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div id="gate" class="login" hidden>
+    <form class="box" id="loginForm">
+      <h1>GEO 控制台</h1>
+      <label>用户名</label>
+      <input name="user" autocomplete="username" />
+      <label>密码</label>
+      <input name="password" type="password" autocomplete="current-password" />
+      <label class="remember"><input id="rememberLogin" type="checkbox" /> 记住账号密码</label>
+      <div class="err" id="loginErr"></div>
+      <button class="primary" type="submit" style="margin-top:14px">登录</button>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <header class="top">
+      <div>
+        <h1>GEO 控制台</h1>
+        <div class="sub" id="who"></div>
+      </div>
+      <div class="row">
+        <select id="tenantFilter" hidden></select>
+        <a class="btn" href="/admin">登录会话</a>
+        <button id="btnRefresh">刷新</button>
+        <button id="btnLogout">退出</button>
+      </div>
+    </header>
+    <div class="wrap">
+      <div class="err" id="dataError" role="alert" hidden></div>
+      <div class="muted" id="loadingStatus" role="status" hidden>正在加载任务…</div>
+      <div class="cards" id="cards"></div>
+      <div id="adminBox" hidden>
+        <div class="row" style="margin-bottom:12px">
+          <input id="newName" placeholder="租户名称" />
+          <input id="newUser" placeholder="登录用户名" />
+          <input id="newPass" type="password" placeholder="登录密码（至少8位）" />
+          <button class="primary" id="btnCreate">创建租户</button>
+        </div>
+        <div class="row" style="margin-bottom:12px">
+          <input id="setAK" placeholder="已有 AK" />
+          <input id="setUser" placeholder="登录用户名" />
+          <input id="setPass" type="password" placeholder="新密码（至少8位）" />
+          <button id="btnSetLogin">为已有租户设置登录</button>
+        </div>
+        <div id="newKey" class="warnbox" hidden></div>
+        <table id="tenantTable"><thead><tr><th>名称</th><th>登录用户</th><th>AK</th><th>任务</th><th>成功</th><th>部分</th><th>失败</th><th>均耗时</th><th>最近</th></tr></thead><tbody></tbody></table>
+        <div style="height:18px"></div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>时间</th><th>租户</th><th>问题</th><th>站点</th><th>状态</th><th>耗时</th><th>回调</th></tr>
+        </thead>
+        <tbody id="jobBody"></tbody>
+      </table>
+      <div class="empty" id="jobEmpty" hidden>还没有调用记录</div>
+      <div class="row" style="margin-top:12px">
+        <button id="btnPrev" disabled>上一页</button>
+        <span class="muted" id="pageInfo"></span>
+        <button id="btnNext" disabled>下一页</button>
+      </div>
+      <div class="detail" id="detail" hidden></div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    const cleanAnswer = (s) => String(s ?? "")
+      .replace(/[\[【]\s*(citation|reference)\s*:\s*\d+(\s*[,，-]\s*\d+)*\s*[\]】]/gi, "")
+      .replace(/[ \t]+\n/g, "\n")
+      .trim();
+    const NAMES = {deepseek:"DeepSeek",doubao:"豆包",yiyan:"文心一言",yuanbao:"元宝",qianwen:"千问",kimi:"Kimi"};
+    let me = null, jobs = [], usage = [], filterAK = "";
+    let offset = 0, displayedOffset = 0, total = 0, loading = false, reloadVersion = 0;
+    const pageSize = 50;
+
+    async function api(path, opt = {}) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      try {
+        const r = await fetch(path, { credentials: "same-origin", cache: "no-store", ...opt, signal: controller.signal });
+        if (r.status === 401) throw Object.assign(new Error("登录已过期，请重新登录"), { code: 401 });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || r.statusText);
+        return data;
+      } catch (e) {
+        if (e.name === "AbortError") throw new Error("请求超时，请点击刷新重试");
+        if (e instanceof TypeError) throw new Error("网络连接失败，请检查连接后刷新");
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    function showError(e) {
+      if (e.code === 401) {
+        $("gate").hidden = false;
+        $("app").hidden = true;
+        $("loginErr").textContent = e.message;
+      } else {
+        $("dataError").textContent = "加载失败：" + e.message;
+        $("dataError").hidden = false;
+      }
+    }
+    function renderPaging() {
+      $("btnRefresh").disabled = loading;
+      $("tenantFilter").disabled = loading;
+      $("btnPrev").disabled = loading || displayedOffset === 0;
+      $("btnNext").disabled = loading || displayedOffset + pageSize >= total;
+      $("pageInfo").textContent = total ? `第 ${displayedOffset + 1}–${Math.min(displayedOffset + jobs.length, total)} 条，共 ${total} 条` : "共 0 条";
+    }
+    function ms(n) {
+      n = Number(n || 0);
+      if (n < 1000) return n + "ms";
+      return (n / 1000).toFixed(1) + "s";
+    }
+
+    async function boot() {
+      try {
+        me = await api("/api/console/me");
+        $("gate").hidden = true;
+        $("app").hidden = false;
+        $("who").textContent = me.role === "admin" ? "管理员 · 可看全部租户" : ("租户 · " + (me.name || me.user || me.ak));
+        $("adminBox").hidden = me.role !== "admin";
+        $("tenantFilter").hidden = me.role !== "admin";
+        await reload();
+      } catch (e) {
+        $("gate").hidden = false;
+        $("app").hidden = true;
+        $("loginErr").textContent = e.code === 401 ? "请登录后查看任务" : "连接失败：" + e.message;
+      }
+    }
+
+    async function reload() {
+      const version = ++reloadVersion;
+      loading = true;
+      $("loadingStatus").hidden = false;
+      $("dataError").hidden = true;
+      renderPaging();
+      const params = new URLSearchParams({ limit: pageSize, offset });
+      if (me.role === "admin" && filterAK) params.set("ak", filterAK);
+      try {
+        const [u, j] = await Promise.all([
+          api("/api/console/usage"),
+          api("/api/console/jobs?" + params),
+        ]);
+        if (version !== reloadVersion) return;
+        usage = u.usage || [];
+        jobs = j.jobs || [];
+        total = j.total ?? jobs.length;
+        displayedOffset = j.offset ?? offset;
+        renderCards();
+        renderJobs();
+        if (me.role === "admin") {
+          const t = await api("/api/admin/tenants");
+          if (version === reloadVersion) renderTenants(t.tenants || []);
+        }
+      } catch (e) {
+        if (version === reloadVersion) {
+          offset = displayedOffset;
+          showError(e);
+        }
+      } finally {
+        if (version === reloadVersion) {
+          loading = false;
+          $("loadingStatus").hidden = true;
+          renderPaging();
+        }
+      }
+    }
+
+    function renderCards() {
+      const rows = usage;
+      const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0);
+      const jobsN = sum("jobs");
+      const ok = sum("succeeded");
+      const part = sum("partial");
+      const fail = sum("failed");
+      const avg = jobsN ? Math.round(rows.reduce((a, r) => a + (r.total_elapsed_ms || 0), 0) / Math.max(1, ok + part + fail)) : 0;
+      $("cards").innerHTML = [
+        ["任务", jobsN],
+        ["成功", ok],
+        ["部分成功", part],
+        ["失败", fail],
+        ["平均耗时", ms(avg)],
+      ].map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+    }
+
+    function renderTenants(list) {
+      const byAk = Object.fromEntries(usage.map((r) => [r.ak, r]));
+      const sel = $("tenantFilter");
+      const cur = filterAK;
+      sel.innerHTML = `<option value="">全部租户</option>` + list.map((t) =>
+        `<option value="${esc(t.ak)}" ${t.ak===cur?"selected":""}>${esc(t.name || t.ak)}</option>`
+      ).join("");
+      $("tenantTable").querySelector("tbody").innerHTML = list.map((t) => {
+        const u = byAk[t.ak] || {};
+        return `<tr data-ak="${esc(t.ak)}">
+          <td>${esc(t.name || "")}</td><td>${esc(t.user || (t.has_login ? "" : "未设置"))}</td><td class="muted">${esc(t.ak)}</td>
+          <td>${u.jobs || 0}</td><td>${u.succeeded || 0}</td><td>${u.partial || 0}</td>
+          <td>${u.failed || 0}</td><td>${ms(u.avg_elapsed_ms || 0)}</td>
+          <td class="muted">${esc((u.last_at || "").replace("T"," ").slice(0,19))}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="9" class="empty">还没有租户</td></tr>`;
+    }
+
+    function renderJobs() {
+      $("jobEmpty").hidden = jobs.length > 0;
+      $("jobBody").innerHTML = jobs.map((j) => {
+        const sites = (j.sites || []).map((id) => {
+          const r = (j.results || []).find((x) => x.site_id === id) || {};
+          const mark = r.ok === true ? "✓" : (r.ok === false ? "✗" : "·");
+          return `${NAMES[id] || id}${mark}`;
+        }).join(" ");
+        return `<tr data-id="${esc(j.job_id)}">
+          <td class="muted">${esc((j.created_at || "").replace("T"," ").slice(0,19))}</td>
+          <td class="muted">${esc(j.ak || me.name || "")}</td>
+          <td>${esc((j.prompt || "").slice(0, 48))}</td>
+          <td>${esc(sites)}</td>
+          <td><span class="st ${esc(j.status)}">${esc(j.status)}</span></td>
+          <td>${ms(j.elapsed_ms)}</td>
+          <td class="muted">${esc(j.callback_status || (j.has_callback ? "—" : "无"))}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    async function showJob(id) {
+      const j = await api("/api/console/jobs/" + id);
+      const rows = (j.results || []).map((r) => {
+        const cites = (r.citation_details || []).slice(0, 8).map((c) =>
+          `<div class="muted"><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title || c.url)}</a>${c.site_name ? ` · ${esc(c.site_name)}` : ""}</div>`
+        ).join("");
+        const steps = (r.steps || []).map((s) => `${s.name} ${s.elapsed_ms}ms`).join(" · ");
+        return `<div style="margin:12px 0 18px">
+          <div><b>${esc(NAMES[r.site_id] || r.site_id)}</b>
+            <span class="st ${r.ok ? "succeeded" : "failed"}">${r.ok ? "成功" : "失败"}</span>
+            <span class="muted">${ms(r.elapsed_ms)} ${esc(r.source || "")}</span>
+          </div>
+          <div class="muted">${esc(r.error || "")}</div>
+          <div class="ans">${esc(cleanAnswer(r.answer) || "(无回答)")}</div>
+          <div class="muted" style="margin-top:6px">${esc(steps)}</div>
+          ${cites}
+        </div>`;
+      }).join("") || `<div class="empty">尚无站点结果</div>`;
+      $("detail").hidden = false;
+      $("detail").innerHTML = `
+        <h2>${esc(j.job_id)} · ${esc(j.status)}</h2>
+        <div class="muted">排队 ${ms(j.queued_ms)} · 执行 ${ms(j.elapsed_ms)} · ${esc(j.created_at || "")}</div>
+        <p>${esc(j.prompt)}</p>
+        ${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}
+        ${rows}`;
+      $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    const loginSavedKey = "geo-console-login";
+    const loginForm = $("loginForm");
+    const rememberLogin = $("rememberLogin");
+    try {
+      const saved = JSON.parse(localStorage.getItem(loginSavedKey) || "null");
+      if (saved && saved.user) {
+        loginForm.user.value = saved.user;
+        loginForm.password.value = saved.password || "";
+        rememberLogin.checked = true;
+      }
+    } catch (e) {}
+    loginForm.onsubmit = async (e) => {
+      e.preventDefault();
+      $("loginErr").textContent = "";
+      const fd = new FormData(e.target);
+      try {
+        await api("/api/console/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: fd.get("user"), password: fd.get("password") }),
+        });
+        if (rememberLogin.checked) {
+          localStorage.setItem(loginSavedKey, JSON.stringify({ user: fd.get("user"), password: fd.get("password") }));
+        } else {
+          localStorage.removeItem(loginSavedKey);
+        }
+        await boot();
+      } catch (ex) {
+        $("loginErr").textContent = ex.message || "登录失败";
+      }
+    };
+    $("btnRefresh").onclick = () => { offset = 0; reload(); };
+    $("btnPrev").onclick = () => { offset = Math.max(0, displayedOffset - pageSize); reload(); };
+    $("btnNext").onclick = () => { offset = displayedOffset + pageSize; reload(); };
+    $("btnLogout").onclick = async () => { await api("/api/console/logout", { method: "POST" }); location.reload(); };
+    $("tenantFilter").onchange = async (e) => {
+      filterAK = e.target.value;
+      offset = displayedOffset = total = 0;
+      jobs = [];
+      renderJobs();
+      $("detail").hidden = true;
+      await reload();
+    };
+    $("jobBody").onclick = (e) => {
+      const tr = e.target.closest("tr");
+      if (tr?.dataset.id) showJob(tr.dataset.id).catch(showError);
+    };
+    $("btnCreate").onclick = async () => {
+      const name = $("newName").value.trim();
+      const user = $("newUser").value.trim();
+      const password = $("newPass").value;
+      if (!name || !user || !password) return;
+      const k = await api("/api/admin/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, user, password }),
+      });
+      $("newKey").hidden = false;
+      $("newKey").textContent = "登录账号=" + k.user + "。调用接口的 AK/SK 只显示这一次： AK=" + k.ak + "  SK=" + k.sk;
+      $("newName").value = ""; $("newUser").value = ""; $("newPass").value = "";
+      await reload();
+    };
+    $("btnSetLogin").onclick = async () => {
+      const ak = $("setAK").value.trim();
+      const user = $("setUser").value.trim();
+      const password = $("setPass").value;
+      if (!ak || !user || !password) return;
+      await api("/api/admin/tenants", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ak, user, password }),
+      });
+      $("newKey").hidden = false;
+      $("newKey").textContent = "已为 " + ak + " 设置登录用户 " + user;
+      $("setAK").value = ""; $("setUser").value = ""; $("setPass").value = "";
+      await reload();
+    };
+    boot();
+  </script>
+</body>
+</html>
